@@ -1,0 +1,68 @@
+---
+title: "Method file construction for 2018 Shengzhou DCSE experiment"
+output: html_notebook
+---
+# Start Project
+First, start a new project in Ion Analytics.  Import the alkane mix .D file and either import a previous alkane method or create one using automated method construction.  Run the method on the alkane file, and export the results from the integration report tab.
+
+# Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(chemhelper)
+```
+
+# Load files
+
+- Master list of RIs
+- Old method file (Compound List)
+- New Alkane file (integration report)
+
+```{r}
+RImaster <- read_csv("/Users/scottericr/Box/IonAnalytics/method_master RIs.csv")
+
+oldmethod <- read_IA("/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv")
+
+alkanes <- read_IA("/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix.D/Meth_073018_alkanemix Integration Report.csv")
+```
+
+# Make alkane table
+Look at alkanes available, add column of carbon number, use actual retention times whenever possible, otherwise use expected RTs.
+
+```{r}
+alkanes_new <-
+  alkanes %>% 
+  slice(1:19) %>%  #that's enough I think.
+  mutate(rt = ifelse(`R.Time [min.]` == 0, `Expect. [min.]`, `R.Time [min.]`)) %>% 
+  select(Compound, rt) %>% 
+  add_column(C_num = 6:24)
+```
+
+# Merge RIs with old method file
+
+```{r}
+shengzhou <- left_join(oldmethod, select(RImaster, Compound, RI_exp))
+shengzhou
+anyNA(shengzhou$RI_exp)
+```
+
+# Back-calculate RTs from master RI file
+
+```{r}
+method_new <-
+  shengzhou %>% 
+  mutate(RT_exp = calc_RT(RI_exp, alkanes_new$rt, alkanes_new$C_num),
+         from = RT_exp - 0.5,
+         to = RT_exp + 0.5,
+         sumfrom = RT_exp - 1,
+         sumto = RT_exp + 1)
+method_new
+```
+
+# Write to file for copy-pasting into IonAnalytics
+
+Import the same methods file you used as `oldmethod` into your new IA project.  Open it up and copy and paste these values.
+
+```{r}
+write_csv(method_new, here("R", "ion_analytics", "adjusted_method_RTs.csv"))
+```
