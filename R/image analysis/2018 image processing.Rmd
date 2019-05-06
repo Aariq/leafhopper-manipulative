@@ -35,7 +35,13 @@ df <- df %>%
          from.path = glue("{scandir}/{path}"),
          to.path = glue("{scandir}/Training Sample/{new.filename}"))
 
-train <- sample_n(df, 30)
+train <- df %>% group_by(cultivar) %>% sample_n(15)
 # file.copy(from = train$from.path, to = train$to.path)
+```
+
+Output a list of file paths. This can be used by FIJI in file > import > Stack From List... to make a virtual stack.  If you save it though, it saves as an actual (non-virtual) stack.
+
+```{r}
+write_csv(select(train, to.path), glue("{scandir}/Training Sample/file_list.csv"),col_names = FALSE)
 ```
 
