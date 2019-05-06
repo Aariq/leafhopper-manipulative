@@ -1,0 +1,45 @@
+---
+title: "Total polyphenols"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+library(here)
+library(car)
+```
+
+Data was collected by Amma in Spring 2019.
+
+```{r}
+tp <- read_csv(here("data", "2017", "raw", "2017 total polyphenols.csv"))
+```
+
+```{r}
+tp
+```
+
+- Sample: cultivar (all were Qing Xin Da Mao)
+- Standard Deviation: from averaging triplicates
+- Polyphenols: galic acid equivalents in mg/mL (i think)
+- Coefficient of Variation: from averaging triplicates
+- Density: leafhopper density at end of experiment in insects/young leaf
+- mg tea: mg of tea powder
+- mg/g GAE: galic acid equivalents in mg/g of tea powder
+
+```{r}
+m <- lm(`mg/g GAE` ~ poly(Density, 2), data = tp%>% filter(`mg/g GAE` > 4))
+m2 <- lm(`mg/g GAE` ~ Density, data = tp%>% filter(`mg/g GAE` > 4))
+m0 <- lm(`mg/g GAE`~ 1, data = tp%>% filter(`mg/g GAE` > 4))
+AIC(m, m2, m0)
+summary(m)
+Anova(m)
+```
+
+
+```{r}
+ggplot(tp %>% filter(`mg/g GAE` > 4), aes(x = Density, y = `mg/g GAE`)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = "y ~ poly(x, 2)")
+```
+
+Seems like maybe that one low point is an outlier.  Could be worth re-doing assay?

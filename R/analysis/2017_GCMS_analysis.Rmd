@@ -1,0 +1,360 @@
+---
+title: "Leafhopper 2017 manipulative experiment analysis"
+output: html_document
+---
+# To Do:
+
+- ~~Arcsin sqrt transform % damage data (a common transformation for percentage data to make normal)~~ (doesn't help)
+- Wait, do I have to do a log-transformation?  What happens if I don't?
+- Remove compounds only found in 3 or fewer samples.
+- This is **not** compositional data (because I care about sums and ratios), so don't do clr transformation
+
+# NOTE: 
+
+The image analysis for these data was done using a classifier trained on a different cultivar.  Just by visually inspecting the images, it didn't do a super great job.  Also, there was a lot of "hopperburn" that threw off the damage measurments.  If I get a chance, I should train a new classifier on a random sample of these leaves and re-run PLS regression with the new damage data.
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(ropls)
+library(chemhelper)
+library(cowplot)
+library(latex2exp)
+library(webchem)
+```
+
+# Read in Data
+
+Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
+
+```{r}
+
+gc_wide.ones <- read_rds(here("data", "2017", "cleaned", "2017_GCMS_wide.rds"))
+gc_tidy.zeroes <- read_rds(here("data", "2017", "cleaned", "2017_GCMS_tidy.rds"))
+
+leafdamage <- read_rds(here("data", "2017", "cleaned", "leaf damage.rds"))
+```
+
+# Summarise leaf damage data
+
+I want to create two columns to merge with the GCMS data.  First, a mean percent damage for each plant, second, the percent damage from the leaf the twister was on.
+
+```{r}
+damage_summary <- leafdamage %>% 
+  group_by(plant.num) %>% 
+  summarise(damage_mean.percent = mean(damage.percent))
+
+twisterleaf <- leafdamage %>% 
+  filter(leaf.num == "T") %>% 
+  select(plant.num, "damage_T" = damage.percent)
+
+damage <- full_join(damage_summary, twisterleaf)
+```
+
+# PLS-R
+
+
+## Log transform data
+
+```{r}
+meta <- c("sample", "density_start", "density_end", "damage_mean.percent", "damage_T")
+
+plsdata <- gc_wide.ones %>% 
+  #do some things to allow joinging
+  separate(sample, into = c("plant.num", "when"), remove = FALSE) %>% 
+  #join with damage data by plant.num
+  left_join(damage) %>% 
+  #clean up columns
+  select(-plant.num, -when) %>% 
+  #reorder columns
+  select(sample, density_start, density_end, damage_mean.percent, damage_T, everything()) %>%
+  #log transform
+  mutate_at(vars(-meta), log)
+```
+
+
+## Explore relationships between different measures of density/damage
+
+```{r}
+ggplot(plsdata, aes(x = density_start, y = density_end)) +
+  geom_point() +
+  ggrepel::geom_label_repel(aes(label = sample)) +
+  geom_smooth(method = "lm")
+
+ggplot(plsdata, aes(x = density_start, y = damage_mean.percent)) +
+  geom_point() +
+  ggrepel::geom_label_repel(aes(label = sample)) +
+  geom_smooth(method = "lm")
+
+ggplot(plsdata, aes(x = density_end, y = damage_mean.percent)) +
+  geom_point() +
+  ggrepel::geom_label_repel(aes(label = sample)) +
+  geom_smooth(method = "lm")
+```
+
+It looks like plant 2 and 12 got a lot of damage for the number of leafhoppers they had, but otherwise density is a decent predictor of mean damage. Start density and end density seem pretty equivalent at predicting damage, but start density seems a little better maybe.
+
+## PCA
+
+```{r}
+pca.5 <- opls(select(plsdata, -meta), scaleC = "standard", plotL = FALSE)
+plot(pca.5, parAsColFcVn = plsdata$density_end, parLabVc = plsdata$sample)
+```
+
+## PLS-R by density_end
+
+```{r}
+plsr_end <- opls(select(plsdata, -meta), plsdata$density_end,
+             scaleC = "standard",
+             predI = 1,
+             orthoI = NA,
+             plotL = FALSE)
+plot(plsr_end, parLabVc = plsdata$sample)
+```
+
+## PLS-R by density_start
+
+```{r}
+plsr_start <- opls(select(plsdata, -meta), plsdata$density_start,
+             scaleC = "standard",
+             predI = 1,
+             orthoI = NA,
+             plotL = FALSE)
+plot(plsr_start, parLabVc = plsdata$sample)
+```
+
+## PLS-R by mean damage
+
+(not run, not significant. doesn't matter if transformed or not.)
+
+```{r eval=FALSE, include=FALSE}
+plsr_md <- opls(select(plsdata, -meta),
+                # plsdata$damage_mean.percent,
+                asin(sqrt(plsdata$damage_mean.percent/100)),
+             scaleC = "standard",
+             predI = 1,
+             orthoI = NA,
+             plotL = FALSE)
+plot(plsr_md, parLabVc = plsdata$sample)
+```
+
+## PLS-R by damage to twister leaf
+
+```{r}
+plsr_td <- opls(select(plsdata, -meta), log(plsdata$damage_T),
+             scaleC = "standard",
+             predI = 1,
+             orthoI = NA,
+             plotL = FALSE)
+plot(plsr_td, parLabVc = plsdata$sample)
+```
+
+PLS by ~~ending leafhopper density~~ twister leaf damage is the best model (highest R2Y and Q2Y and lowest RMSEE).  I'll use that for future analyses
+
+## Extract VIP
+
+```{r}
+VIPs <-
+  # get_VIP(plsr_end) %>%
+  get_VIP(plsr_td) %>%
+  arrange(desc(VIP)) %>%
+  rename(Compound = "Variable")
+VIPs
+```
+
+Different set of compounds associated with leaf damage than with leafhopper density. Hmmmmmmmmm
+
+## Get correlation coefs with density
+
+figured out with help from [stack overflow](https://goo.gl/9hacZe)
+
+```{r message=FALSE, warning=FALSE}
+correlations <- 
+  gc_tidy.zeroes %>% 
+  select(-sample, -rt) %>%
+  nest(-Compound) %>%
+  mutate(cor.test = map(data,
+                        ~cor.test(.$density_end, log(.$RPA), method = "spearman") %>%
+                          broom::glance(.))) %>% 
+  unnest(cor.test) %>% 
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  select(Compound, estimate, p.value, p.adj)
+
+VIPtable <- left_join(VIPs, correlations) %>% filter(VIP > 1)
+VIPtable
+# write_excel_csv(VIPtable, here("figs", "prelim VIP table.csv"))
+```
+
+### Summarise VIP results
+
+How many VIPs are positive correlations?  How many negative?
+
+```{r}
+VIPtable %>%
+  summarise(num.pos = sum(estimate > 0),
+            num.neg = sum(estimate < 0))
+```
+
+How many high VIPs also significant univariate (log) correlations?
+
+```{r}
+VIPtable_strict <-
+  VIPtable %>%
+  filter(p.adj <= 0.05)
+
+VIPtable_strict
+
+VIPtable_strict %>%
+  summarise(num.pos = sum(estimate > 0),
+            num.neg = sum(estimate < 0))
+```
+
+## Check out univariate plots for VIPs
+
+```{r}
+plsdata.tidy <-
+  plsdata %>% 
+  gather(-sample, -density_start, -density_end, -damage_mean.percent, -damage_T,
+         key = Compound, value = logRPA)
+#For ones with significant correlations also
+plsdata.tidy %>%
+  filter(Compound %in% VIPtable_strict$Compound)
+
+d <-
+  left_join(VIPtable_strict %>% filter(VIP > 2), plsdata.tidy) %>% 
+  mutate(Compound = fct_inorder(Compound)) %>% 
+  mutate(Compound = case_when(str_detect(Compound, "Farnesene")      ~ "(E,E)-alpha-Farnesene",
+                              str_detect(Compound, "Hepten-")        ~ "6-methyl-5-Hepten-2-one",
+                              str_detect(Compound, "Linalool oxide") ~ "dehydroxy-trans-Linalool oxide",
+                              str_detect(Compound, "Bergamot")       ~ "trans-alpha-Bergamotene",
+                              str_detect(Compound, "Hexenyl")        ~ "(Z)-3-hexenyl hexenoate",
+                              str_detect(Compound, "Ocimene\\<allo-\\>")  ~ "allo-Ocimene",
+                              str_detect(Compound, "Ocimene\\<\\(E\\)-beta-\\>") ~ "(E)-beta-Ocimene",
+                              TRUE ~ as.character(Compound)))
+```
+```{r density-end-plot}
+colors <- c(
+  "(E,E)-alpha-Farnesene" = "#F57670",
+  "6-methyl-5-Hepten-2-one" = "#A3A420",
+  "trans-alpha-Bergamotene" = "#925211",
+  "Myrcene" = "#92130B",
+  "dehydroxy-trans-Linalool oxide" = "#1EBD7F"
+  )
+
+univariate <-
+  ggplot(d, aes(x = density_end, y = logRPA)) +
+  geom_point(aes(color = Compound)) +
+  # geom_smooth(method = "lm", se = FALSE, formula = y ~ poly(x,2)) +
+  # geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~fct_reorder(Compound, logRPA, mean, .desc = TRUE), scales = "free_y") +
+  labs(x = "Leafhopper Density (insects/shoot)",
+       y = "log(Relative peak area)") +
+  theme_grey() +
+  theme(rect = element_rect("black"),
+        text = element_text(color = "white"),
+        axis.text = element_text(color = "white"),
+        axis.ticks = element_line(color = "white"),
+        legend.position = "none") +
+  scale_color_manual(values = colors)
+
+univariate
+```
+
+```{r}
+save_plot(here("figs", "density-end-plot.png"),
+          univariate,
+          nrow = 2, ncol = 3,
+          base_width = 2.5,
+          base_height = 2.5)
+```
+
+## Flavor percepts for VIPs
+
+I'm going with these top 6 VIPs that have VIP > 1 but also have a significant p-value from a correlation.
+
+```{r}
+method <-
+  read_IA(here("Method File Construction", "BACE_MS-Subtraction Compound References.csv")) %>%
+  select(Compound, CAS)
+VIPtable <- 
+  left_join(VIPtable %>% filter(VIP>2), method)
+VIPtable <- VIPtable %>% 
+  mutate(percept = fn_percept(as.cas(CAS))) %>% 
+  #manually insert flavor percepts for dehydroxy linalool oxide from FooDB.ca
+  mutate(percept = ifelse(CAS == "54750708", "green, herbal, minty, phenolic, rosemary, spice", percept))
+VIPtable
+```
+
+## Better plots
+
+```{r}
+#extract plot data
+pcaplotdata <-
+  pca.5 %>%
+  get_plotdata()
+#annotate with leafhopper density
+pcaplotdata$scores <-
+  pcaplotdata$scores %>%
+  add_column(density = plsdata$density_end)
+
+#generate plot
+p <-
+  ggplot(pcaplotdata$scores, aes(x = p1, y = p2, color = density)) +
+  geom_point(size = 3) +
+  labs(x = paste0("PC1 (", round(pcaplotdata$axis_stats$R2X[1]*100, 2), "%)"),
+       y = paste0("PC2 (", round(pcaplotdata$axis_stats$R2X[2]*100, 2), "%)")) +
+  scale_color_gradient("Leafhopper Density\n(number / shoot)", low = "blue", high = "red") +
+  theme_bw() +
+  ggtitle("PCA with density labeled",
+          subtitle = TeX(paste("$R^2(cum) = ",
+                               last(pcaplotdata$axis_stats$`R2X(cum)`),
+                               "$ with ",
+                               length(pcaplotdata$axis_stats$`R2X(cum)`),
+                               " components")))
+p
+```
+
+```{r}
+plsplotdata <-
+  plsr_end %>%
+  get_plotdata()
+
+p2 <-
+  ggplot(plsplotdata$scores, aes(x = p1, y = o1, color = y1)) +
+  geom_point(size = 3) +
+  labs(x = paste0("Predictive (", round(plsplotdata$axis_stats[1,1]*100, 2), "%)"),
+       y = paste0("Orthogonal (", round(plsplotdata$axis_stats[2,1]*100, 2), "%)")) +
+  scale_color_gradient("Leafhopper Density\n(number / shoot)", low = "blue", high = "red") +
+  ggtitle("OPLS", subtitle = TeX(paste0("$R^2_Y = ", plsplotdata$model_stats$`R2Y(cum)`,
+                                        "$; $Q^2 = ", plsplotdata$model_stats$`Q2(cum)`,
+                                        "$; $p_{Q^2} = ", plsplotdata$model_stats$pQ2))) +
+  theme_grey() +
+  theme(rect = element_rect("black"),
+        text = element_text(color = "white"),
+        axis.text = element_text(color = "white"),
+        axis.ticks = element_line(color = "white"))
+p2
+```
+
+```{r}
+save_plot(here("figs", "PLSR plot talk.png"), p2, base_aspect_ratio = 1.4)
+```
+
+```{r}
+legend <- get_legend(p)
+p.out <- 
+  plot_grid(p + theme(legend.position = "none"),
+            p2 + theme_bw() + theme(legend.position = "none"),
+            legend,
+            ncol = 3, nrow = 1, rel_widths = c(1,1,0.5))
+
+save_plot(here("figs", "prelim PCA.png"), p.out, ncol = 2, nrow = 1, base_aspect_ratio = 1.1)
+```
+
+# Write Data
+```{r}
+plsdata %>% 
+  write_rds(here("cleaned_data", "leafhopper pls data.rds"))
+```
+

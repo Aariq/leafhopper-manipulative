@@ -64,5 +64,5 @@ method_new
 Import the same methods file you used as `oldmethod` into your new IA project.  Open it up and copy and paste these values.
 
 ```{r}
-write_csv(method_new, here("R", "ion_analytics", "adjusted_method_RTs.csv"))
+write_csv(method_new, here("R", "ion_analytics", "2018_adjusted_method_RTs.csv"))
 ```

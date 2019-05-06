@@ -1,0 +1,342 @@
+---
+title: "GC Data Wrangling and Pre-processing"
+output: html_notebook
+---
+
+Date initialized: 2018-04-30
+Date compiled: `r Sys.Date()`
+
+```{r packages, message=FALSE, warning=FALSE}
+library(tidyverse) #for data manipulation
+library(stringr) #for functions to deal with strings
+library(here)
+library(forcats)
+library(chemhelper)
+library(gglabeller)
+library(cowplot)
+```
+
+
+# Workflow Overview
+
+1. Tag 0's as nondetects
+2. Tag 0<Area<1000 as censored
+3. Filter out known contaminants
+4. Calculate RPA
+5. Split data into samples and method blank
+6. Subtract RPAs of method blank
+
+This will give you sample data with 0s and possibly negative values for RPA and flags for nondetects and peaks that should be censored.
+
+7. Remove compounds that are not found in more than 2 samples (at least 3 samples) with RPA > 0
+8a. Set RPA for nondetects, censored, and all RPA <= 0  to 1/IS
+8b. Set RPA for nondetects, censored, and all RPA < 0 to 0 (for venn diagram)
+9. Check for and remove any obvious outliers
+10. Create wide dataframes from 8a and 8b.
+
+# Read in files
+
+```{r directories}
+#this is the directory that contains data files loaded into the project already
+Data.dir <- "/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/Fujian 2017 Manipulative/Data/"
+files <- dir(Data.dir,
+             pattern = "Fujian Manipulative Adjusted2 Integration Report.csv",
+             full.names = TRUE, #adds full path
+             recursive = TRUE) #drills down in directory structure
+
+filenames <- str_extract(files, "(?<=/)[^/]+(?=/[^/]+$)")
+samples <- str_extract(filenames, "(?<=Hop_).+(?=\\.D)")
+gc_tidy <- files %>%
+  map(read_IA) %>%
+  set_names(samples) %>% 
+  bind_rows(.id = "sample") %>% 
+  rename(area = `Area [a.u.*s]`,
+         rt = `R.Time [min.]`)
+gc_tidy
+```
+
+# Tag non-detects and to-be-censored
+
+```{r}
+gc_tidy <-
+  gc_tidy %>%
+  mutate(ND = area == 0,
+         Censor = area > 0 & area < 1000)
+```
+
+# Remove known contaminants and problematic peaks
+Contaminants:
+
+- Propanoic acid, 2-methyl-, 1-(1, 1-dimethylethyl)-2methyl-1, 3-propanediyl ester (from nitrile gloves)
+- Toluene (very large peak, seems unlikely that it is a natural product)
+
+These chlorinated compounds are likely pesticides:
+
+- Benzaldehyde, 2,6-dichloro-
+- Benzene, chloro-
+
+These compounds should be removed for other reasons:
+
+- 141: Unknown that shows up in method blanks.  Nicole doesn't know what it is, but is pretty sure it is contaminant.
+- Anything with an RT earlier than 3.3-ish (currently corresponds to No. > 91)
+
+Problematic peaks includes peaks that I decided were bad, and should be marked as "not found" in all files, but was too lazy to go through and mark in Ion Analytics.  It's much easier to just exclude them in R.
+
+ - (135) Heptane, 2,4-dimethyl-: Check all.  Bad peak, borderline Q value.
+ - (181) 1 (DCSE): Hitting same peak as (180) Pentane, 1-nitro-.  Mark all as not found.  Remove from method when done with deconvolution so it doesn't get propogated to the next dataset.
+ - (234) 37: Pretty bad peak.  Mark all as not found?
+ - (268, 269): unknown 64 = limonene? Mark 64 as not found.
+ - (329) 2-Nonanone: Bad peak.  Mark all as not found
+ - (345) Fenchol<endo->: Bad peak.  Mark all as not found
+ - (408) 158: Matches a few other peaks.  Mark all as not found
+ - (419) 127: one ion low.  mark all as not found. Consider removing from method (could be decanal + noise?)
+ - (554) Geranylacetone: Hits same peak as (556) 5,9-Undecadien-2-one...  Mark all as not found.
+
+```{r}
+contaminants <- c("Propanoic acid, 2-methyl-, 1-(1,1-dimethylethyl)-2-methyl-1,3-propanediyl ester",
+                  "Toluene",
+                  "Benzyl chloride",
+                  "Benzene, chloro-",
+                  "Benzaldehyde, 2,6-dichloro-",
+                  "141")
+
+problematic <- c(135, 181, 234, 268, 329, 345, 408, 419, 554)
+gc_tidy.1 <- gc_tidy %>%
+  filter(!Compound %in% contaminants) %>%
+  filter(No. > 91) %>% 
+  filter(!No. %in% problematic)
+```
+
+# Manually check low Q-value compounds
+One last check for problematic peaks.
+
+```{r}
+gc_tidy.1 %>% 
+  filter(QVal < 90 & !ND & !Censor) %>%
+  arrange(sample, QVal)
+```
+
+# Calculate RPA
+
+```{r}
+#extract napthalene D8 area
+gc_IS <- gc_tidy.1 %>% 
+  filter(Compound == "Naphthalene-D8") %>%
+  rename(IS = area) %>% 
+  select(sample, IS)
+
+#join with gc.tidy and mutate to calculate RPA
+gc_tidy.2 <- full_join(gc_tidy.1, gc_IS)
+gc_tidy.2 <- gc_tidy.2 %>% 
+  mutate(RPA = area/IS) %>% 
+  #don't need Naphtalene-D8 anymore
+  filter(Compound != "Naphthalene-D8")
+gc_tidy.2
+```
+
+# Method blank subtraction
+
+I have two method blanks, one from the beginning and one from the end.  I could average them and subtract from all samples or subtract the start blank from the start samples and the end blank from the end samples.
+
+For now, I'm just using the end data, so I'll just use the end blank.
+
+```{r}
+#split into samples and background
+gc_blank <- gc_tidy.2 %>% filter(str_detect(sample,"blank_end"))
+gc_tidy.3 <- gc_tidy.2 %>% filter(!str_detect(sample, "blank"))
+#subtract background
+gc_blank.1 <- gc_blank %>%
+   rename(background = RPA) %>% 
+   select(Compound, background)
+gc_tidy.3 <- left_join(gc_tidy.3, gc_blank.1)
+gc_tidy.4 <- gc_tidy.3 %>% mutate(RPA = RPA - background)
+```
+
+# Remove rare peaks
+
+Remove compounds that are found in 3 or fewer samples.
+
+```{r}
+gc_keepers <- gc_tidy.4 %>%
+  group_by(Compound) %>%
+  summarise(test = sum(RPA > 0)) %>%
+  filter(test >=3) %>%
+  select(-test)
+
+gc_tidy.5 <- left_join(gc_keepers, gc_tidy.4) %>%
+  select(sample, No., Type, Compound, everything()) %>%
+  arrange(sample)
+```
+
+
+# Read in treatment data and join
+
+```{r}
+treatment_raw <-
+  read_csv(here("data", "2017", "raw", "2017 manipulative experiment treatment data.csv")) %>%
+  filter(!is.na(Plant)) %>% #remove empty lines
+  filter(Plant != "blank") #remove blanks
+treatment_raw 
+```
+
+In this experiment, I first counted the number of young leaves (`Leaves`), then randomly assigned a density treatment (`Density`, leafhoppers per leaf).  I then put on about the right ammount of leafhoppers (`Leafhoppers.start`).  After the experiment ran, I counted the leafhoppers again at the end (`Leafhoppers.end`).  I measured chemistry with DCSE before putting any leafhoppers on (samples that end with `_start`) and again when I counted the final number of leafhoppers (samples that end with `_end`).
+
+I'll calculate an exact starting and ending density (and mean density?) to use for statistics.
+
+```{r}
+trt_data <- 
+  treatment_raw %>%
+  mutate(sample = paste0(Plant, "_end")) %>% 
+  select(-Plant, -Twister.start, -Twister.end, -Notes, -Density) %>% 
+  select(sample, everything()) %>% 
+  mutate(density_start = ifelse(Leafhoppers.start == 0, 0, Leafhoppers.start / Leaves), 
+         #necessary because of NAs for Leaves
+         density_end = ifelse(Leafhoppers.end == 0, 0, Leafhoppers.end / Leaves))
+```
+
+```{r}
+gc_tidy.6 <- left_join(gc_tidy.5, trt_data)
+```
+
+
+# Deal with non-detects, censored peaks, and other zeros and negative values
+
+Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  There may be other RPA values <= 0 due to subtracting the method blank.
+
+I want to deal with these values in two ways:
+
+1. Set them all to zero.  This will be useful for calculating numbers of compounds detected in various samples and for making venn diagrams.
+
+2. Set them all to 1/IS.  This will be useful for log-transforming data since log(0) = -inf.
+
+```{r}
+gc_tidy.ones <-
+  gc_tidy.6 %>%
+  mutate(RPA = case_when(ND      ~ 1/IS,
+                         Censor  ~ 1/IS,
+                         RPA <=0 ~ 1/IS,
+                         TRUE    ~ RPA),
+         Present = case_when(ND      ~ FALSE,
+                             Censor  ~ FALSE,
+                             RPA <=0 ~ FALSE,
+                             TRUE    ~ TRUE)) %>%
+  select(sample, density_start, density_end, Compound, RPA, rt, Present)
+
+gc_tidy.zeroes <-
+  gc_tidy.6 %>%
+  mutate(RPA = case_when(ND      ~ 0,
+                         Censor  ~ 0,
+                         RPA <=0 ~ 0,
+                         TRUE    ~ RPA)) %>%
+  select(sample, density_start, density_end, Compound, RPA, rt)
+```
+
+# Create wide data frames
+
+```{r}
+gc_wide.zeroes <-
+  gc_tidy.zeroes %>%
+  select(-rt) %>%
+  spread(key = Compound, value = RPA)
+
+gc_wide.ones <- 
+  gc_tidy.ones %>%
+  select(-rt, -Present) %>%
+  spread(key = Compound, value = RPA)
+```
+
+
+# Preliminary Data Analysis
+
+I'll use a combination of univariate scatterplots and PCA to check for outliers
+
+## Univariate plots
+
+### Prepare data
+1. Order compounds by mean RPA so that when I break them into chunks, the scales will be more helpful
+2. Slice data into chunks
+3. Graph 'em with gglabeller and select potential outliers
+
+```{r}
+plot_data <-
+  gc_tidy.zeroes %>%
+  mutate(shortname = str_trunc(Compound, 12) %>%
+           fct_reorder(RPA, mean), #reorder compounds
+         group = as.numeric(shortname) %>%
+           cut(6) %>%
+           as.integer()) %>% 
+  split(.$group)
+#must explicitly drop unused factors or gglabeller won't work
+plot_data <- map(plot_data, ~ select(., -group) %>% mutate(shortname = fct_drop(shortname))) 
+```
+
+### Label plots
+
+```{r eval=FALSE}
+plots <- map(plot_data,
+    ~ggplot(., aes(y = RPA, x = shortname, color = density_end, label = sample)) +
+     geom_point() +
+      coord_flip() +
+      scale_x_discrete(drop = FALSE) +
+      theme_bw()
+)
+plots.labeled <- map(plots, gglabeller)
+plots.labeled
+```
+
+Sample 8_end shows up consistently as an extreme value.
+
+## Preliminary PCA
+
+```{r}
+library(ropls)
+pca.1 <- opls(select(gc_wide.ones, -density_start, -density_end, -sample), scaleC = "standard")
+pca.2 <-
+  gc_wide.ones %>%
+  mutate_at(vars(-density_start, -density_end, -sample), log) %>%
+  select(-sample, -density_start, -density_end) %>%
+  opls(scaleC = "standard")
+
+plot(pca.2, parLabVc = gc_wide.ones$sample)
+plot(pca.1, parLabVc = gc_wide.ones$sample)
+```
+
+log transformation makes PCA worse? Either way, 8_end is definitely a major outlier
+
+# Remove Outliers
+
+```{r}
+outliers <- c("8_end")
+pca.3 <- gc_wide.ones %>%
+  filter(!sample %in% outliers) %>%
+  select(-density_start, -density_end, -sample) %>%
+  opls(scaleC = "standard")
+
+pca.4 <- gc_wide.ones %>%
+  filter(!sample %in% outliers) %>%
+  mutate_at(vars(-sample, -density_start, -density_end), log) %>%
+  select(-density_start, -density_end, -sample) %>%
+  opls(scaleC = "standard")
+
+plot(pca.3, parLabVc = gc_wide.ones %>% filter(!sample %in% outliers) %>% .$sample)
+plot(pca.4, parLabVc = gc_wide.ones %>% filter(!sample %in% outliers) %>% .$sample)
+```
+
+No, log improves I think.
+
+Remove outlier:
+
+```{r}
+gc_wide.ones <- gc_wide.ones %>% filter(!sample %in% outliers) 
+gc_wide.zeroes <- gc_wide.zeroes %>% filter(!sample %in% outliers) 
+gc_tidy.ones <- gc_tidy.ones %>% filter(!sample %in% outliers) 
+gc_tidy.zeroes <- gc_tidy.zeroes %>% filter(!sample %in% outliers) 
+```
+
+
+# Write to file
+
+```{r}
+write_rds(gc_wide.ones, here("data", "2017", "cleaned", "2017_GCMS_wide.rds"))
+write_rds(gc_tidy.zeroes, here("data", "2017", "cleaned", "2017_GCMS_tidy.rds"))
+```
