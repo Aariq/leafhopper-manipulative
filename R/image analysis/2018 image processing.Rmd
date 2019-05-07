@@ -20,11 +20,7 @@ scandir <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative"
 leaves <- list.files(scandir, recursive = TRUE, pattern = "leaf.+\\.png", full.names = FALSE)
 length(leaves)
 
-# runif(1, 1, 1000)
-set.seed(688)
-test <- sample(leaves, 40)
 
-str_view(test, "[^/]+(?=.png)")
 
 df <- tibble(path = leaves)
 df <- df %>%
@@ -35,13 +31,48 @@ df <- df %>%
          from.path = glue("{scandir}/{path}"),
          to.path = glue("{scandir}/Training Sample/{new.filename}"))
 
-train <- df %>% group_by(cultivar) %>% sample_n(15)
+# runif(1, 1, 1000)
+set.seed(688)
+train <- df %>% group_by(cultivar) %>% sample_n(15) %>% ungroup()
 # file.copy(from = train$from.path, to = train$to.path)
 ```
 
-Output a list of file paths. This can be used by FIJI in file > import > Stack From List... to make a virtual stack.  If you save it though, it saves as an actual (non-virtual) stack.
+Output a list of file paths. This can be used by FIJI in file > import > Stack From List... to make a virtual stack. However, I think it crops and/or resizes leaves, which isn't optimal.
 
 ```{r}
-write_csv(select(train, to.path), glue("{scandir}/Training Sample/file_list.csv"),col_names = FALSE)
+# write_csv(select(train, to.path), glue("{scandir}/Training Sample/file_list.csv"),col_names = FALSE)
+list.files(glue("{scandir}/Training Sample/"), pattern = "*.png", full.names = TRUE) %>% 
+  write_lines(glue("{scandir}/Training Sample/file_list.csv"))
+```
+
+Instead, I should open all the images and convert to stack manually.  I've previously used this macro to automatically make stacks.  I should edit it to make stacks of ~30 for later.
+
+```{javascript}
+dir = getDirectory("choose a folder");
+
+list = getFileList(dir);
+nstacks = -floor(-list.length/5);
+print(nstacks);
+stacksize = round(list.length/nstacks);
+
+//for each stack:
+for(n=0; n<nstacks; n++){
+	//open the first set of files
+	files = Array.slice(list, stacksize*(n), stacksize*(n+1));
+	for (i=0; i<files.length; i++){
+			open(files[i]);
+		}
+	run("Images to Stack", "method=[Copy (top-left)] name=Stack title=[] use");
+	width = getWidth;
+	height = getHeight;
+	setColor("white");
+	for (j=1; j<=nSlices; j++){
+		setSlice(j);
+		floodFill(width-1, height-1);
+	}
+
+	saveAs("tiff", dir + "/Stack_" + n + ".tif");
+	close();
+}
 ```
 
