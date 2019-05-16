@@ -34,18 +34,69 @@ df <- df %>%
 # runif(1, 1, 1000)
 set.seed(688)
 train <- df %>% group_by(cultivar) %>% sample_n(15) %>% ungroup()
-# file.copy(from = train$from.path, to = train$to.path)
+# file.copy(from = train$from.path, to = train$to.path) #DO NOT UNCOMMENT THIS.  THE ACTUAL TEST SET DOESN"T MATCH THESE FILES.  I MUST HAVE CHANGED THE SEED OR SOMETHING BY ACCIDENT.
 ```
 
 Output a list of file paths. This can be used by FIJI in file > import > Stack From List... to make a virtual stack. However, I think it crops and/or resizes leaves, which isn't optimal.
 
 ```{r}
 # write_csv(select(train, to.path), glue("{scandir}/Training Sample/file_list.csv"),col_names = FALSE)
-list.files(glue("{scandir}/Training Sample/"), pattern = "*.png", full.names = TRUE) %>% 
-  write_lines(glue("{scandir}/Training Sample/file_list.csv"))
+train_set <- list.files(glue("{scandir}/Training Sample"), pattern = "*.png", full.names = TRUE) 
+
+# train_set %>% 
+#   write_lines(glue("{scandir}/Training Sample/file_list.csv"))
 ```
 
-Instead, I should open all the images and convert to stack manually.  I've previously used this macro to automatically make stacks.  I should edit it to make stacks of ~30 for later.
+Instead, I should open all the images and convert to stack manually. 
+
+
+# Training the classifier
+
+I trained the classifier using these images with the following settings:
+
+Training features:
+
+- Hessian
+- Sobel
+- Variance
+- Minimum
+- Median
+- Anisotropic
+- Bilateral
+
+With a minimum sigma of 2 and a maximum of 16
+
+These settings gave the lowest out of bag error.  The training set included some folded leaves and some dead leaves, which I might eventually exclude from the final data, but I think that's ok.
+
+I saved the data and classifier as `full_stack_classifier.model` and `full_stack_data.aarf`.
+
+I loaded these into the WEKA experimenter and saved the experiment as `full_stack_experiment.exp`.  I loaded the explorer and found kappa = 0.996.  However, this is using the classifier on the training set.  I need to make a test set to do this properly
+
+# Making a test set.
+
+```{r}
+set.seed(509)
+test_set <-
+  df %>%
+  # filter(!to.path %in% train_set) %>%
+  filter(!str_detect(path, "Training")) %>%   #exclude training samples
+  group_by(cultivar) %>% 
+  sample_n(5) %>%  #get 5 from each CV to test classifier on
+  ungroup() %>% 
+  mutate(to.path = str_replace(to.path, "Training Sample", "Test Sample"))
+test_set
+
+file.copy(from = test_set$from.path, to = test_set$to.path)
+```
+
+
+
+
+
+
+
+
+I've previously used this macro to automatically make stacks.  I should edit it to make stacks of ~30 for later.
 
 ```{javascript}
 dir = getDirectory("choose a folder");
