@@ -219,3 +219,9 @@ lcms_complete_2017 <-
 lcms_complete_2017
 ```
 
+# Write data to rds
+
+```{r}
+write_rds(lcms_complete_2017, here("data", "cleaned", "2017_lcms.rds"))
+```
+
