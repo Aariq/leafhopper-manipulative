@@ -87,7 +87,7 @@ p.polished <-
   annotate(geom = "text", x = 1.1, y = 4, label = "p = 0.093")
 
 p.polished
-save_plot(here("figs", "2017 total polyphenols.png"), p.polished, base_aspect_ratio = 1.5)
+save_plot(here("figs", "2017 total polyphenols.png"), p.polished, base_aspect_ratio = 1.1)
 ```
 
 
