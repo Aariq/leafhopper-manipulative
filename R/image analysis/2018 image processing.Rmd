@@ -5,11 +5,15 @@ output: html_notebook
 
 Date initiated: 2019-05-06
 Date compiled: `r Sys.Date()`
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(here)
 library(tidyverse)
 library(glue)
 ```
+
+**Goal:**
+
+This document contains notes about doing the image analysis.
 
 # Choose random images for training set
 
@@ -20,9 +24,9 @@ scandir <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative"
 leaves <- list.files(scandir, recursive = TRUE, pattern = "leaf.+\\.png", full.names = FALSE)
 length(leaves)
 
-
-
+# make a tibble of all the paths to images
 df <- tibble(path = leaves)
+# mutate to make paths for where to copy
 df <- df %>%
   mutate(cultivar = str_extract(path, "^[^/]+(?=/)"),
          scan = str_extract(path, "(?<=/).+(?=/)"),
@@ -31,9 +35,12 @@ df <- df %>%
          from.path = glue("{scandir}/{path}"),
          to.path = glue("{scandir}/Training Sample/{new.filename}"))
 
+## Take a random sample of rows
 # runif(1, 1, 1000)
 set.seed(688)
 train <- df %>% group_by(cultivar) %>% sample_n(15) %>% ungroup()
+
+# Copy them into a training set folder
 # file.copy(from = train$from.path, to = train$to.path) #DO NOT UNCOMMENT THIS.  THE ACTUAL TEST SET DOESN"T MATCH THESE FILES.  I MUST HAVE CHANGED THE SEED OR SOMETHING BY ACCIDENT.
 ```
 
@@ -47,7 +54,7 @@ train_set <- list.files(glue("{scandir}/Training Sample"), pattern = "*.png", fu
 #   write_lines(glue("{scandir}/Training Sample/file_list.csv"))
 ```
 
-Instead, I should open all the images and convert to stack manually. 
+Instead, I opened all the images and convert to stack manually.  I fill in any black resulting from different image sizes by hand with the fill tool using a color that matches the background
 
 
 # Training the classifier
@@ -68,11 +75,12 @@ With a minimum sigma of 2 and a maximum of 16
 
 These settings gave the lowest out of bag error.  The training set included some folded leaves and some dead leaves, which I might eventually exclude from the final data, but I think that's ok.
 
-I saved the data and classifier as `full_stack_classifier.model` and `full_stack_data.aarf`.
+I saved the data and classifier as `full_stack_classifier.model` and `full_stack_data.arff`.
 
 I loaded these into the WEKA experimenter and saved the experiment as `full_stack_experiment.exp`.  I loaded the explorer and found kappa = 0.996.  However, this is using the classifier on the training set.  I need to make a test set to do this properly
 
-# Making a test set.
+## Making a test set.
+To properly test the performance of the classifier, I need to test it on images that weren't in the training set.
 
 ```{r}
 set.seed(509)
@@ -84,46 +92,152 @@ test_set <-
   sample_n(5) %>%  #get 5 from each CV to test classifier on
   ungroup() %>% 
   mutate(to.path = str_replace(to.path, "Training Sample", "Test Sample"))
-test_set
+# test_set
 
-file.copy(from = test_set$from.path, to = test_set$to.path)
+# file.copy(from = test_set$from.path, to = test_set$to.path)
+```
+
+After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the `full_stack_classifier.model` on it.  This gives a kappa of 0.998 ± 0.001
+
+# Applying the classifier
+To apply the classifier to a folder of images, I used a beanshell script found in the Weka manual, reproduced below
+
+```{javascript}
+// @File(label="Input directory", description="Select the directory with input images", style="directory") inputDir
+// @File(label="Output directory", description="Select the output directory", style="directory") outputDir
+// @File(label="Weka model", description="Select the Weka model to apply") modelPath
+// @String(label="Result mode",choices={"Labels","Probabilities"}) resultMode
+ 
+import trainableSegmentation.WekaSegmentation;
+import trainableSegmentation.utils.Utils;
+import ij.io.FileSaver;
+import ij.IJ;
+import ij.ImagePlus;
+  
+// starting time
+startTime = System.currentTimeMillis();
+  
+// caculate probabilities?
+getProbs = resultMode.equals( "Probabilities" );
+ 
+// create segmentator
+segmentator = new WekaSegmentation();
+// load classifier
+segmentator.loadClassifier( modelPath.getCanonicalPath() );
+  
+// get list of input images
+listOfFiles = inputDir.listFiles();
+for ( i = 0; i < listOfFiles.length; i++ )
+{
+    // process only files (do not go into sub-folders)
+    if( listOfFiles[ i ].isFile() )
+    {
+        // try to read file as image
+        image = IJ.openImage( listOfFiles[i].getCanonicalPath() );
+        if( image != null )
+        {                   
+            // apply classifier and get results (0 indicates number of threads is auto-detected)
+            result = segmentator.applyClassifier( image, 0, getProbs );
+ 
+            if( !getProbs )
+                // assign same LUT as in GUI
+                result.setLut( Utils.getGoldenAngleLUT() );
+             
+            // save result as TIFF in output folder
+            outputFileName = listOfFiles[ i ].getName().replaceFirst("[.][^.]+$", "") + ".tif";
+            new FileSaver( result ).saveAsTiff( outputDir.getPath() + File.separator + outputFileName );
+  
+            // force garbage collection (important for large images)
+            result = null; 
+            image = null;
+            System.gc();
+        }
+    }
+}
+// print elapsed time
+estimatedTime = System.currentTimeMillis() - startTime;
+IJ.log( "** Finished processing folder in " + estimatedTime + " ms **" );
+```
+
+# Getting results
+The script above creates the results images, but to get data in a tabular form, I used an ImageJ macro that Michelle Mu helped write:
+
+```{javascript}
+//ImageJ macro for exporting numerical results from classified images
+inpath = getDirectory("Analyzed Images");
+
+//get file names
+files = getFileList(inpath);
+for(n = 0; n < lengthOf(files); n++){
+	print(files[n]);
+}
+
+category = newArray("damaged", "undamaged", "background")
+for(j = 0; j < lengthOf(files); j++){ //loop through files
+    open(files[j]);
+    title = getTitle();
+    getStatistics(area, mean, min, max, std, histogram); //this gets the number of pixels
+
+    //add a column to results table
+    for (i=0; i<3; i++) { //just do the first three rows in the histogram, corresponding to three colors of classified image
+            setResult("Category", i, category[i]);
+            setResult(title, i, histogram[i]); //adds a column for each file
+    }   
+	close(); //close the image before opening a new one
+}
+saveAs("results", inpath + "//results.txt"); //saves results table as text file
+run("Clear Results");
 ```
 
 
+This produces a results.txt file with columns that have the image file name and rows for damaged, undamaged, and background pixel counts.  The file names are just "leaf 1.tif", "leaf 2.tif", etc. and do not contain info about the sample or cultivar.  That info is in the containing folder.
 
+So, I think what I need to do is:
 
+1. ~~read in results.txt~~
+2. ~~append column headings with folder name~~
+3. ~~gather~~
+4. ~~spread~~
+5. ~~rowbind everything~~
+6. ~~separate cultivar, sample # and leaf #~~
+7. merge sample #'s where there is an "a" and a "b" (because not all the leaves fit in one scan originally)
+8. calculate leaf area in mm^2 (need a conversion for this.  hmm...I'm pretty sure I remembered to scan a ruler at some point)
+8. ~~calculate % damage~~
+9. summarize by sample
+10. add columns for twister leaf on each plant
+11. export!
 
+## Read in results.txt's
 
+```{r}
+jgy_path <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
+results.files <- list.files(jgy_path, recursive = TRUE, "results.txt", full.names = FALSE)
+results.paths <- list.files(jgy_path, recursive = TRUE, "results.txt", full.names = TRUE)
+#i don't know a better way to do this
 
+results.list <-
+  map(results.paths, read_tsv) %>%
+  set_names(str_extract(results.files, ".+(?=/results/)"))
+```
 
-I've previously used this macro to automatically make stacks.  I should edit it to make stacks of ~30 for later.
+## Wrangle
 
-```{javascript}
-dir = getDirectory("choose a folder");
+```{r}
+results.raw <- map2_dfr(.x = results.list, .y = names(results.list), ~{
+  .x %>%
+    select(-X1) %>% 
+    rename_at(vars(-matches("Category")), .funs = list(~paste(.y, .))) %>% 
+    gather(-Category, key = filename, value = pixels) %>% 
+    spread(key = Category, value = pixels) 
+}) 
 
-list = getFileList(dir);
-nstacks = -floor(-list.length/5);
-print(nstacks);
-stacksize = round(list.length/nstacks);
-
-//for each stack:
-for(n=0; n<nstacks; n++){
-	//open the first set of files
-	files = Array.slice(list, stacksize*(n), stacksize*(n+1));
-	for (i=0; i<files.length; i++){
-			open(files[i]);
-		}
-	run("Images to Stack", "method=[Copy (top-left)] name=Stack title=[] use");
-	width = getWidth;
-	height = getHeight;
-	setColor("white");
-	for (j=1; j<=nSlices; j++){
-		setSlice(j);
-		floodFill(width-1, height-1);
-	}
-
-	saveAs("tiff", dir + "/Stack_" + n + ".tif");
-	close();
-}
+results.raw %>% 
+  separate(filename, into = c("plant", "trash", "leaf")) %>% 
+  select(-trash) %>% 
+  mutate(cultivar = str_extract(plant, "\\D"),
+         leaf_area_px = undamaged + damaged,
+         #leaf_area_mm2 = leaf_area_px * ?????,
+         percent_damage = damaged/leaf_area_px * 100) %>% 
+  select(cultivar, plant, leaf, everything())
 ```
 
