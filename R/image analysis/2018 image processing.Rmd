@@ -132,12 +132,12 @@ test_set2 <-
 file.copy(from = test_set2$from.path, to = test_set2$to.path)
 ```
 
-After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the `full_stack_classifier.model` on it.  This gives a kappa of 0.998 ± 0.001 for the 2018 data
+After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the trained classifier on it.  This gives a kappa of 0.998 ± 0.001 for the 2018 data and 0.985 ± 0.002 for the 2017 data.
 
 # Applying the classifier
 ## Image curation
 
-First I dealt with folded leaves.  If the leaf margins were folded back, I did nothing.  If they were folded forward, so as to obscure some of the underside of the leaf, I used a paint tool to erase the overlapping section.
+First I dealt with folded leaves.  If the leaf margins were folded back, I did nothing.  If they were folded forward, so as to obscure some of the underside of the leaf, I used a paint tool to erase the overlapping section.  I also edited out petioles and obvious particles of dirt, dead insects, or broken leaves.  Some leaves were completely excluded, for example if they were facing the wrong direction (upper side of leaf) or had a lot of shadows or dirt on them obscuring the leaf color.
 
 
 To apply the classifier to a folder of images, I used a beanshell script found in the Weka manual, reproduced below
