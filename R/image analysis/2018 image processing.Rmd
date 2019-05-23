@@ -19,8 +19,10 @@ This document contains notes about doing the image analysis.
 
 First, copy a random subset of files to use as a training set.
 
+## 2018
+
 ```{r}
-scandir <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative"
+# scandir <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative" #change to network drive?
 leaves <- list.files(scandir, recursive = TRUE, pattern = "leaf.+\\.png", full.names = FALSE)
 length(leaves)
 
@@ -56,6 +58,29 @@ train_set <- list.files(glue("{scandir}/Training Sample"), pattern = "*.png", fu
 
 Instead, I opened all the images and convert to stack manually.  I fill in any black resulting from different image sizes by hand with the fill tool using a color that matches the background
 
+## 2017
+
+```{r}
+# scandir2017 <- "/Users/scottericr/Box/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
+scandir2017 <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
+leaves2 <- list.files(scandir2017, recursive = TRUE, pattern = ".+\\.png", full.names = FALSE)
+df2 <- tibble(path = leaves2)
+
+df2 <- df2 %>%
+  mutate(plant = str_extract(path, "^[^/]+(?=/)"),
+         file = str_extract(path, "[^/]+(?=.png)")) %>% 
+  mutate(from.path = glue("{scandir2017}/{path}"),
+         to.path = glue("{scandir2017}/Training Sample/{file}.png"))
+
+# runif(1, 1, 1000)
+set.seed(2)
+
+train2017 <- df2 %>% sample_n(30)
+train2017
+
+file.copy(from = train2017$from.path, to = train2017$to.path)
+```
+
 
 # Training the classifier
 
@@ -77,7 +102,9 @@ These settings gave the lowest out of bag error.  The training set included some
 
 I saved the data and classifier as `full_stack_classifier.model` and `full_stack_data.arff`.
 
-I loaded these into the WEKA experimenter and saved the experiment as `full_stack_experiment.exp`.  I loaded the explorer and found kappa = 0.996.  However, this is using the classifier on the training set.  I need to make a test set to do this properly
+This was repeated for both 2017 and 2018 separately.
+
+I loaded these into the WEKA experimenter and saved the experiment as `full_stack_experiment.exp`.  I loaded the explorer and found kappa = 0.996 for the 2018 data.  However, this is using the classifier on the training set.  I need to make a test set to do this properly
 
 ## Making a test set.
 To properly test the performance of the classifier, I need to test it on images that weren't in the training set.
@@ -95,11 +122,24 @@ test_set <-
 # test_set
 
 # file.copy(from = test_set$from.path, to = test_set$to.path)
+
+test_set2 <-
+  df2 %>% 
+  filter(!to.path %in% train2017$to.path) %>% 
+  sample_n(10) %>% 
+  mutate(to.path = str_replace(to.path, "Training Sample", "Test Sample"))
+
+file.copy(from = test_set2$from.path, to = test_set2$to.path)
 ```
 
-After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the `full_stack_classifier.model` on it.  This gives a kappa of 0.998 ± 0.001
+After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the `full_stack_classifier.model` on it.  This gives a kappa of 0.998 ± 0.001 for the 2018 data
 
 # Applying the classifier
+## Image curation
+
+First I dealt with folded leaves.  If the leaf margins were folded back, I did nothing.  If they were folded forward, so as to obscure some of the underside of the leaf, I used a paint tool to erase the overlapping section.
+
+
 To apply the classifier to a folder of images, I used a beanshell script found in the Weka manual, reproduced below
 
 ```{javascript}
