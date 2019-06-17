@@ -21,7 +21,7 @@ First, copy a random subset of files to use as a training set.
 
 ## 2018
 
-```{r}
+```{r eval=FALSE}
 # scandir <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative" #change to network drive?
 leaves <- list.files(scandir, recursive = TRUE, pattern = "leaf.+\\.png", full.names = FALSE)
 length(leaves)
@@ -46,21 +46,11 @@ train <- df %>% group_by(cultivar) %>% sample_n(15) %>% ungroup()
 # file.copy(from = train$from.path, to = train$to.path) #DO NOT UNCOMMENT THIS.  THE ACTUAL TEST SET DOESN"T MATCH THESE FILES.  I MUST HAVE CHANGED THE SEED OR SOMETHING BY ACCIDENT.
 ```
 
-Output a list of file paths. This can be used by FIJI in file > import > Stack From List... to make a virtual stack. However, I think it crops and/or resizes leaves, which isn't optimal.
-
-```{r}
-# write_csv(select(train, to.path), glue("{scandir}/Training Sample/file_list.csv"),col_names = FALSE)
-train_set <- list.files(glue("{scandir}/Training Sample"), pattern = "*.png", full.names = TRUE) 
-
-# train_set %>% 
-#   write_lines(glue("{scandir}/Training Sample/file_list.csv"))
-```
-
-Instead, I opened all the images and convert to stack manually.  I fill in any black resulting from different image sizes by hand with the fill tool using a color that matches the background
+I opened all the images in FIJI and converted them to a stack.  I filled in any black resulting from different image sizes by hand with the fill tool using a color that matches the background.
 
 ## 2017
 
-```{r}
+```{r eval=FALSE}
 # scandir2017 <- "/Users/scottericr/Box/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
 scandir2017 <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
 leaves2 <- list.files(scandir2017, recursive = TRUE, pattern = ".+\\.png", full.names = FALSE)
@@ -78,7 +68,7 @@ set.seed(2)
 train2017 <- df2 %>% sample_n(30)
 train2017
 
-file.copy(from = train2017$from.path, to = train2017$to.path)
+# file.copy(from = train2017$from.path, to = train2017$to.path)
 ```
 
 
@@ -109,7 +99,7 @@ I loaded these into the WEKA experimenter and saved the experiment as `full_stac
 ## Making a test set.
 To properly test the performance of the classifier, I need to test it on images that weren't in the training set.
 
-```{r}
+```{r eval=FALSE}
 set.seed(509)
 test_set <-
   df %>%
@@ -129,7 +119,7 @@ test_set2 <-
   sample_n(10) %>% 
   mutate(to.path = str_replace(to.path, "Training Sample", "Test Sample"))
 
-file.copy(from = test_set2$from.path, to = test_set2$to.path)
+# file.copy(from = test_set2$from.path, to = test_set2$to.path)
 ```
 
 After adding ROIs to these images as if I were training a new classifier, I saved the data as `test_data.arff`.  I could then open this up in the Weka experimenter and use the trained classifier on it.  This gives a kappa of 0.998 ± 0.001 for the 2018 data and 0.985 ± 0.002 for the 2017 data.
@@ -153,7 +143,7 @@ import trainableSegmentation.utils.Utils;
 import ij.io.FileSaver;
 import ij.IJ;
 import ij.ImagePlus;
-  
+
 // starting time
 startTime = System.currentTimeMillis();
   
@@ -240,7 +230,7 @@ So, I think what I need to do is:
 4. ~~spread~~
 5. ~~rowbind everything~~
 6. ~~separate cultivar, sample # and leaf #~~
-7. merge sample #'s where there is an "a" and a "b" (because not all the leaves fit in one scan originally)
+7. ~~merge sample #'s where there is an "a" and a "b" (because not all the leaves fit in one scan originally)~~
 8. calculate leaf area in mm^2 (need a conversion for this.  hmm...I'm pretty sure I remembered to scan a ruler at some point)
 8. ~~calculate % damage~~
 9. summarize by sample
@@ -250,28 +240,36 @@ So, I think what I need to do is:
 ## Read in results.txt's
 
 ```{r}
-jgy_path <- "/Users/scottericr/Box/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
-results.files <- list.files(jgy_path, recursive = TRUE, "results.txt", full.names = FALSE)
-results.paths <- list.files(jgy_path, recursive = TRUE, "results.txt", full.names = TRUE)
-#i don't know a better way to do this
+jgy_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
+lj_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Longjing"
+q_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
 
-results.list <-
-  map(results.paths, read_tsv) %>%
-  set_names(str_extract(results.files, ".+(?=/results/)"))
+#need to do the 2017 data separately since filenames are a little different.
+filenames_2018 <- list.files(c(jgy_path, lj_path), recursive = TRUE, "results.txt", full.names = FALSE)
+paths_2018 <- list.files(c(jgy_path, lj_path), recursive = TRUE, "results.txt", full.names = TRUE)
+
+filenames_2017 <- list.files(q_path, recursive = TRUE, "results.txt", full.names = FALSE)
+paths_2017 <- list.files(q_path, recursive = TRUE, "results.txt", full.names = TRUE)
+
+dflist_2018 <-
+  map(paths_2018, read_tsv) %>%
+  set_names(str_extract(filenames_2018, ".+(?=/results/)"))
+
+dflist_2017 <- 
+  map(paths_2017, read_tsv) %>% 
+  set_names(paste0("Q", str_extract(filenames_2017, ".+(?=/results/)")))
 ```
 
 ## Wrangle
 
 ```{r}
-results.raw <- map2_dfr(.x = results.list, .y = names(results.list), ~{
+raw_2018 <- map2_dfr(.x = dflist_2018, .y = names(dflist_2018), ~{
   .x %>%
-    select(-X1) %>% 
+    select(-matches("X1")) %>% #remove column X1 if it exists
     rename_at(vars(-matches("Category")), .funs = list(~paste(.y, .))) %>% 
     gather(-Category, key = filename, value = pixels) %>% 
     spread(key = Category, value = pixels) 
-}) 
-
-results.raw %>% 
+})  %>% 
   separate(filename, into = c("plant", "trash", "leaf")) %>% 
   select(-trash) %>% 
   mutate(cultivar = str_extract(plant, "\\D"),
@@ -279,5 +277,110 @@ results.raw %>%
          #leaf_area_mm2 = leaf_area_px * ?????,
          percent_damage = damaged/leaf_area_px * 100) %>% 
   select(cultivar, plant, leaf, everything())
+
+raw_2017 <- map2_dfr(.x = dflist_2017, .y = names(dflist_2017), ~{
+  .x %>% 
+    select(-matches("X1")) %>% 
+    gather(-Category, key = filename, value = pixels) %>% 
+    spread(key = Category, value = pixels)
+}) %>% 
+  separate(filename, into = c("trash", "plant", "trash2", "leaf")) %>% 
+  select(-trash, -trash2) %>% 
+  add_column(cultivar = "Q") %>% 
+  mutate(leaf_area_px = undamaged + damaged,
+         # leaf_area_mm2 = leaf_area_px * ????,
+         percent_damage = damaged/leaf_area_px * 100) %>% 
+  select(cultivar, plant, leaf, everything())
+```
+
+Next, combine a's and b's---multiple scans of same plant.  I think the easiest way to do this is to just remove the letter from the plant ID and move it to the leaf #
+
+```{r}
+results_2018 <-
+  raw_2018 %>% 
+  mutate(leaf = case_when(str_detect(plant, "a$") & leaf != "T" ~ paste0(leaf, "a"),
+                          str_detect(plant, "b$") & leaf != "T" ~ paste0(leaf, "b"),
+                          TRUE ~ leaf),
+         plant = str_remove(plant, "[a-b]$"))
+
+results_2017 <- raw_2017
+
+write_rds(results_2018, here('data', 'cleaned', '2018_leaf_damage.rds'))
+write_rds(results_2017, here('data', 'cleaned', '2017_leaf_damage_new.rds'))
+```
+
+
+
+# Summarize and combine with treatment info
+
+These data will be more useful if I summarize them by plant (mean damage, twister leaf damage, n leaves) and combine with treatment info (leafhopper density treatment, before and after density) to make for easier merging with other datasets.
+
+```{r}
+twister_leaf_2018 <-
+  results_2018 %>%
+  filter(leaf == "T") %>%
+  select(cultivar, plant, twister_damage = percent_damage)
+
+summary_2018 <-
+  results_2018 %>% 
+  group_by(cultivar, plant) %>% 
+  summarize(mean_leaf_area_px = mean(leaf_area_px),
+            mean_percent_damage = mean(percent_damage),
+            n_leaves = n()) %>% 
+  left_join(twister_leaf_2018)
+
+twister_leaf_2017 <-
+  results_2017 %>% 
+  filter(leaf == "T") %>% 
+  select(cultivar, plant, twister_damage = percent_damage)
+
+summary_2017 <-
+  results_2017 %>% 
+  group_by(cultivar, plant) %>% 
+  summarize(mean_leaf_area_px = mean(leaf_area_px),
+            mean_percent_damage = mean(percent_damage),
+            n_leaves = n()) %>% 
+  left_join(twister_leaf_2017)
+```
+
+read in treatment data to merge
+
+```{r}
+treatment_2018_raw <- readxl::read_excel(here('data', 'raw', '2018 density experiment.xlsx')) %>%
+  janitor::clean_names()
+
+treatment_2018 <- 
+  treatment_2018_raw %>% 
+  mutate(final_number_of_leafhoppers = as.numeric(final_number_of_leafhoppers)) %>% 
+  mutate(cultivar = str_extract(cultivar, "^."),
+         plant = paste0(cultivar, bag_id),
+         density_start = initial_number_of_leafhoppers/number_shoots,
+         density_end = final_number_of_leafhoppers/number_shoots) %>% 
+  select(cultivar, plant, density_treatment, density_start, density_end)
+
+treatment_data_2018 <- left_join(summary_2018, treatment_2018)
+
+```
+
+```{r}
+treatment_2017_raw <- read_csv(here('data', 'raw', '2017 manipulative experiment treatment data.csv')) %>% 
+  janitor::clean_names()
+
+treatment_2017 <- 
+  treatment_2017_raw %>% 
+  add_column(cultivar = "Q") %>% 
+  # mutate(plant = paste0(cultivar, plant)) %>% 
+  mutate(density_start = leafhoppers_start/leaves,
+         density_end = leafhoppers_end/leaves) %>% 
+  select(cultivar, plant, density_treatment = density, density_start, density_end) %>% 
+  filter(!is.na(density_treatment)) %>% 
+  replace_na(list(density_start = 0, density_end = 0))
+
+treatment_data_2017 <- left_join(summary_2017, treatment_2017)
+```
+
+```{r}
+write_rds(treatment_data_2018, here('data', 'cleaned', '2018_treatment_data.rds'))
+write_rds(treatment_data_2017, here('data', 'cleaned', '2017_treatment_data.rds'))
 ```
 
