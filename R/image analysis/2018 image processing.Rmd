@@ -233,13 +233,13 @@ So, I think what I need to do is:
 7. ~~merge sample #'s where there is an "a" and a "b" (because not all the leaves fit in one scan originally)~~
 8. calculate leaf area in mm^2 (need a conversion for this.  hmm...I'm pretty sure I remembered to scan a ruler at some point)
 8. ~~calculate % damage~~
-9. summarize by sample
-10. add columns for twister leaf on each plant
-11. export!
+9. ~~summarize by sample~~
+10. ~~add columns for twister leaf on each plant~~
+11. ~~export!~~
 
 ## Read in results.txt's
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 jgy_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
 lj_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Longjing"
 q_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2017/Manipulative/Manipulative Experiment Leaf Scans"
@@ -251,6 +251,7 @@ paths_2018 <- list.files(c(jgy_path, lj_path), recursive = TRUE, "results.txt", 
 filenames_2017 <- list.files(q_path, recursive = TRUE, "results.txt", full.names = FALSE)
 paths_2017 <- list.files(q_path, recursive = TRUE, "results.txt", full.names = TRUE)
 
+# Read them all in as dataframes and name them
 dflist_2018 <-
   map(paths_2018, read_tsv) %>%
   set_names(str_extract(filenames_2018, ".+(?=/results/)"))
@@ -263,48 +264,54 @@ dflist_2017 <-
 ## Wrangle
 
 ```{r}
-raw_2018 <- map2_dfr(.x = dflist_2018, .y = names(dflist_2018), ~{
+raw_2018 <-
+  map2_dfr(.x = dflist_2018, .y = names(dflist_2018), ~{
   .x %>%
     select(-matches("X1")) %>% #remove column X1 if it exists
     rename_at(vars(-matches("Category")), .funs = list(~paste(.y, .))) %>% 
     gather(-Category, key = filename, value = pixels) %>% 
     spread(key = Category, value = pixels) 
-})  %>% 
-  separate(filename, into = c("plant", "trash", "leaf")) %>% 
+})  
+
+results_2018 <-
+  raw_2018 %>% 
+  separate(filename, into = c("sample", "trash", "leaf")) %>% 
   select(-trash) %>% 
-  mutate(cultivar = str_extract(plant, "\\D"),
+  mutate(cultivar = str_extract(sample, "\\D"),
+         plant_num = str_extract(sample, "\\d+"),
          leaf_area_px = undamaged + damaged,
          #leaf_area_mm2 = leaf_area_px * ?????,
          percent_damage = damaged/leaf_area_px * 100) %>% 
-  select(cultivar, plant, leaf, everything())
+  select(sample, cultivar, plant_num, leaf, everything()) %>% 
+  
+  # Next, combine a's and b's---multiple scans of same plant.
+  mutate(leaf = case_when(str_detect(sample, "a$") & leaf != "T" ~ paste0(leaf, "a"),
+                          str_detect(sample, "b$") & leaf != "T" ~ paste0(leaf, "b"),
+                          TRUE ~ leaf),
+         sample = str_remove(sample, "[a-b]$"))
 
-raw_2017 <- map2_dfr(.x = dflist_2017, .y = names(dflist_2017), ~{
+raw_2017 <-
+  map2_dfr(.x = dflist_2017, .y = names(dflist_2017), ~{
   .x %>% 
     select(-matches("X1")) %>% 
     gather(-Category, key = filename, value = pixels) %>% 
     spread(key = Category, value = pixels)
-}) %>% 
-  separate(filename, into = c("trash", "plant", "trash2", "leaf")) %>% 
+}) 
+
+results_2017 <-
+  raw_2017 %>% 
+  separate(filename, into = c("trash", "plant_num", "trash2", "leaf")) %>% 
   select(-trash, -trash2) %>% 
   add_column(cultivar = "Q") %>% 
-  mutate(leaf_area_px = undamaged + damaged,
+  mutate(sample = paste0(cultivar, plant_num),
+         leaf_area_px = undamaged + damaged,
          # leaf_area_mm2 = leaf_area_px * ????,
          percent_damage = damaged/leaf_area_px * 100) %>% 
-  select(cultivar, plant, leaf, everything())
+  select(sample, cultivar, plant_num, leaf, everything())
 ```
 
-Next, combine a's and b's---multiple scans of same plant.  I think the easiest way to do this is to just remove the letter from the plant ID and move it to the leaf #
 
 ```{r}
-results_2018 <-
-  raw_2018 %>% 
-  mutate(leaf = case_when(str_detect(plant, "a$") & leaf != "T" ~ paste0(leaf, "a"),
-                          str_detect(plant, "b$") & leaf != "T" ~ paste0(leaf, "b"),
-                          TRUE ~ leaf),
-         plant = str_remove(plant, "[a-b]$"))
-
-results_2017 <- raw_2017
-
 write_rds(results_2018, here('data', 'cleaned', '2018_leaf_damage.rds'))
 write_rds(results_2017, here('data', 'cleaned', '2017_leaf_damage_new.rds'))
 ```
@@ -319,11 +326,11 @@ These data will be more useful if I summarize them by plant (mean damage, twiste
 twister_leaf_2018 <-
   results_2018 %>%
   filter(leaf == "T") %>%
-  select(cultivar, plant, twister_damage = percent_damage)
+  select(sample, twister_damage = percent_damage)
 
 summary_2018 <-
   results_2018 %>% 
-  group_by(cultivar, plant) %>% 
+  group_by(cultivar, sample) %>% 
   summarize(mean_leaf_area_px = mean(leaf_area_px),
             mean_percent_damage = mean(percent_damage),
             n_leaves = n()) %>% 
@@ -332,11 +339,11 @@ summary_2018 <-
 twister_leaf_2017 <-
   results_2017 %>% 
   filter(leaf == "T") %>% 
-  select(cultivar, plant, twister_damage = percent_damage)
+  select(sample, twister_damage = percent_damage)
 
 summary_2017 <-
   results_2017 %>% 
-  group_by(cultivar, plant) %>% 
+  group_by(cultivar, sample) %>% 
   summarize(mean_leaf_area_px = mean(leaf_area_px),
             mean_percent_damage = mean(percent_damage),
             n_leaves = n()) %>% 
@@ -346,33 +353,36 @@ summary_2017 <-
 read in treatment data to merge
 
 ```{r}
-treatment_2018_raw <- readxl::read_excel(here('data', 'raw', '2018 density experiment.xlsx')) %>%
+treatment_2018_raw <-
+  readxl::read_excel(here('data', 'raw', '2018 density experiment.xlsx')) %>%
   janitor::clean_names()
 
 treatment_2018 <- 
   treatment_2018_raw %>% 
   mutate(final_number_of_leafhoppers = as.numeric(final_number_of_leafhoppers)) %>% 
   mutate(cultivar = str_extract(cultivar, "^."),
-         plant = paste0(cultivar, bag_id),
+         sample = paste0(cultivar, bag_id),
          density_start = initial_number_of_leafhoppers/number_shoots,
-         density_end = final_number_of_leafhoppers/number_shoots) %>% 
-  select(cultivar, plant, density_treatment, density_start, density_end)
+         density_end = final_number_of_leafhoppers/number_shoots,
+         plant_num = as.character(bag_id)) %>% 
+  select(sample, cultivar, plant_num, density_treatment, density_start, density_end)
 
 treatment_data_2018 <- left_join(summary_2018, treatment_2018)
 
 ```
 
 ```{r}
-treatment_2017_raw <- read_csv(here('data', 'raw', '2017 manipulative experiment treatment data.csv')) %>% 
+treatment_2017_raw <-
+  read_csv(here('data', 'raw', '2017 manipulative experiment treatment data.csv')) %>% 
   janitor::clean_names()
 
 treatment_2017 <- 
   treatment_2017_raw %>% 
   add_column(cultivar = "Q") %>% 
-  # mutate(plant = paste0(cultivar, plant)) %>% 
+  mutate(sample = paste0(cultivar, plant)) %>%
   mutate(density_start = leafhoppers_start/leaves,
          density_end = leafhoppers_end/leaves) %>% 
-  select(cultivar, plant, density_treatment = density, density_start, density_end) %>% 
+  select(cultivar, sample, plant_num = plant, density_treatment = density, density_start, density_end) %>% 
   filter(!is.na(density_treatment)) %>% 
   replace_na(list(density_start = 0, density_end = 0))
 
