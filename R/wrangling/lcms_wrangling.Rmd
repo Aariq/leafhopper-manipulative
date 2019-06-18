@@ -6,8 +6,10 @@ output: html_notebook
 Date initiated: 2019-05-08
 Date last compiled: `r Sys.Date()`
 
-# NOTE:
-use updated data from Amma.  "2017 total polyphenols.csv" doesn't have sample names entered correctly.
+#TODO:
+
+- Fix problem in `2018 image processing.Rmd` that makes the `sample` and `plant_num` columns not uniform.  `sample` should be "Q12", `plant_num` should be "12".
+
 
 ```{r}
 library(tidyverse)
@@ -34,13 +36,12 @@ lcms_data <-
   select(-(2:10)) #get rid of compound metadata
 ```
 
-Now try to capture sample names
+Now capture sample names
 
 ```{r}
 sample_names <- read_excel(here("data", "raw", "Tea_LCMS_Report_050719.xlsx"), 
     range = "M4:GF5")
 
-sample_names
 
 colnames(lcms_data) <- c("compound", colnames(sample_names))
 ```
@@ -51,80 +52,10 @@ get rid of flags columns and gather
 ```{r}
 lcms_tidy <-
   lcms_data %>% 
-  select(-starts_with("...")) %>% 
+  select(-starts_with("...")) %>% #flags columns, not important
   gather(-compound, key = "sample", value = "conc") %>% 
-  mutate(conc = as.numeric(conc)) #NAs are non-detects. need to deal with later.
-# lcms_tidy
-```
-## Sample amounts
-the weight of tea powder used in the extractions is in the total polyphenols data.
-
-```{r}
-sample_ammount_2017.raw <- read_csv(here("data", "raw", "2017 total polyphenols.csv"))
-sample_amount_2017 <- 
-  sample_ammount_2017.raw %>%
-  clean_names() %>% 
-  add_column(plant_num = c(1:2, 4:20)) %>% # I just looked this up in the paper copy I have of Amma's final report
-  mutate(sample = paste0(sample, plant_num)) %>% 
-  select(sample, density, mg_tea) #keeping density so I can double check merge later.
-```
-
-hmm... this doesn't have correct sample ID's.  I'd have to join by Density, which seems irresponsible.  Hopefully better once I get raw data from Amma.
-
-
-## 2017 leaf damage data
-
-```{r}
-leaf_damage_2017 <- read_rds(here("data", "cleaned", "2017_leaf_damage.rds"))
-```
-
-## 2017 leafhopper density data
-```{r}
-hopper_density_2017.raw <- read_csv(here("data", "raw", "2017 manipulative experiment treatment data.csv"))
-hopper_density_2017 <-
-  hopper_density_2017.raw %>%
-  clean_names() %>% 
-  slice(1:19) %>% #get rid of blank sample and empty rows
-  select(plant, treatment = density, leaves, leafhoppers_start, leafhoppers_end) %>% 
-  mutate(density_start = leafhoppers_start / leaves,
-         density_end = leafhoppers_end / leaves) %>% 
-  mutate_at(vars(density_start, density_end), ~replace_na(.,0)) %>%  
-  #I didnt count leaves if treatment was 0, fix resulting NAs
-  select(plant, density_start, density_end)
-```
-
-
-
-
-Ok, now I need to do a few more things:
-
-- deal with non-detects
-    + could use 1/IS (paraxanthine), but I'm not sure that makes sense
-    + could use 0
-    + could use 1/small number.  E.g. smallest concentration detected in whole dataset.
-- join sample amount data and convert concentrations from ug/mL to ug/mg (same as mg/g, right?)
-- ~~remove blanks and standards~~
-- ~~pull cultivar/year data from sample~~
-- ~~figure out why some samples were repeated~~
-- ~~separate 2017 and 2018 data~~
-- join with density and leaf damage data
-- Spread so each compound is a column to get wide data for stats
-
-
-# Deal with nondetects
-For now I'll use zeroes, but this may change to something more sophisitcated later
-
-```{r}
-lcms_tidy <-
-  lcms_tidy %>% 
-  mutate(conc = replace_na(conc, 0)) 
-```
-
-# Remove blanks and standards
-
-```{r}
-lcms_tidy %>% 
-  filter(!str_detect(sample, "blank"), !str_detect(sample, "Tea_Std"))
+  mutate(conc = as.numeric(conc)) %>%  #NAs are non-detects. need to deal with later.
+  filter(!str_detect(sample, "blank"), !str_detect(sample, "Tea_Std")) #remove blanks and standards
 ```
 
 # Create columns for cultivar and plant number
@@ -132,24 +63,9 @@ lcms_tidy %>%
 ```{r}
 lcms_tidy <-
   lcms_tidy %>% 
-  mutate(cultivar = case_when(str_detect(sample, "Q") ~ "Qing Xin Da Mao",
-                              str_detect(sample, "L") ~ "Long Jing",
-                              str_detect(sample, "J") ~ "Jin Guan Yin")) %>% 
+  mutate(cultivar = str_extract(sample, "^\\D")) %>% 
   mutate(plant_num = str_extract(sample, "\\d+")) %>% 
   select(compound, sample, cultivar, plant_num, conc)
-```
-
-
-# Split 2017 and 2018
-
-```{r}
-lcms_tidy_2017 <- 
-  lcms_tidy %>% 
-  filter(str_detect(sample, "Q"))
-
-lcms_tidy_2018 <-
-  lcms_tidy %>% 
-  filter(!str_detect(sample, "Q"))
 ```
 
 # Deal with duplicates
@@ -157,7 +73,7 @@ lcms_tidy_2018 <-
 For Q14--Q20 the samples were run twice.  Josh ran out of nitrogen for a few weeks and when he got more, he ran diluted samples that had been kept at -4º as well as new dilutions from samples that had been kept at -80º.  He said the -80 storage (Q##_2) look more similar to the other samples and I should probably use those.  It looks like there was a storage effect for theanine, caffeine, and ECG (and maybe EGCG)
 
 ```{r}
-lcms_tidy_2017 %>% 
+lcms_tidy %>% 
   filter(sample %in% c("Q14", "Q14_2", "Q15", "Q15_2", "Q16", "Q16_2", "Q17", "Q17_2", "Q18", "Q18_2", "Q19", "Q19_2", "Q20", "Q20_2")) %>% 
 ggplot(aes(x = sample, y = conc)) +
   geom_point() +
@@ -165,8 +81,8 @@ ggplot(aes(x = sample, y = conc)) +
 ```
 
 ```{r}
-lcms_tidy_2017 <-
-  lcms_tidy_2017 %>% 
+lcms_tidy <-
+  lcms_tidy %>% 
   filter(!sample %in% c(paste0("Q", 14:20))) %>% 
   mutate(sample = str_remove(sample, "_\\d"))
 ```
@@ -176,52 +92,92 @@ lcms_tidy_2017 <-
 Josh's data is in µg/mL and he said he accounted for the 10.1 dillution.  We used about 20 mg for 1 mL for the extraction. So, to get µg/mg should just have to divide by the sample amount (about 20mg). 
 
 To get µg/mg tea leaf
+
 ```{r}
-lcms_tidy_2017 <-
-  full_join(lcms_tidy_2017, sample_amount_2017) %>% 
+sample_ammount_2017 <-
+  read_csv(here("data", "raw", "2017QData - Sheet1.csv")) %>%
+  clean_names() %>% 
+  select(sample, mg_tea)
+
+sample_ammount_2018 <- 
+  read_csv(here('data', 'raw', '2018 total polyphenols.csv')) %>% 
+  clean_names() %>% 
+  select(sample, mg_tea)
+
+sample_ammount <- bind_rows(sample_ammount_2017, sample_ammount_2018)
+```
+
+```{r}
+lcms_tidy <-
+  full_join(lcms_tidy, sample_ammount) %>% 
   mutate(conc_ug_mg = conc/mg_tea)
-lcms_tidy_2017
 ```
 
 
-
-# Join with damage and density data
-
-## 2017
-
-### 2017 leaf damage
-
-First I need to summarize leaf damage by plant
+# Add in treatment and leaf damage data
 
 ```{r}
-plant_damage_2017 <-
-  leaf_damage_2017 %>% 
-  group_by(plant.num) %>% 
-  select(-leaf.num) %>% 
-  summarise_all(mean)
+leaf_damage_2017 <-
+  read_rds(here('data', 'cleaned', '2017_treatment_data.rds'))
+
+leaf_damage_2018 <-
+  read_rds(here('data', 'cleaned', '2018_treatment_data.rds'))
+
+leaf_damage <- bind_rows(leaf_damage_2017, leaf_damage_2018)
+
+lcms_complete <- left_join(lcms_tidy, leaf_damage) #only keep damage data for plants that I have LCMS data for.
 ```
+
+
+Ok, now I need to do a few more things:
+
+- deal with non-detects
+    + could use 1/IS (paraxanthine), but I'm not sure that makes sense
+    + could use 0
+    + could use 1/small number.  E.g. smallest concentration detected in whole dataset.
+- separate 2017 and 2018 data
+- Spread so each compound is a column to get wide data for stats
+
+
+
+# Split 2017 and 2018
+
+These should be analyzed separately since methods were different.  That's why I'm splitting them in the wrangling step.
 
 ```{r}
-lcms_damage_2017 <-
-  full_join(lcms_tidy_2017, plant_damage_2017, by = c("plant_num" = "plant.num")) %>% 
-  select(sample, cultivar, plant_num, damaged, undamaged, damage_percent = damage.percent, compound, conc_ug_mg)
-lcms_damage_2017
+lcms_2017 <- 
+  lcms_complete %>% 
+  filter(str_detect(sample, "Q"))
+
+lcms_2018 <-
+  lcms_complete %>% 
+  filter(!str_detect(sample, "Q"))
 ```
 
-### 2017 leafhopper density
-It's important to note that for 2017 the density is insects/young leaf
+
+
+# Create wide versions
 
 ```{r}
-lcms_complete_2017 <-
-  full_join(lcms_damage_2017, hopper_density_2017, by = c("plant_num" = "plant")) %>% 
-  select(sample, cultivar, plant_num, density_start, density_end, everything())
+lcms_2017_wide <- lcms_2017 %>% 
+  select(-conc, -mg_tea) %>% #keep only the ug/mg concentration
+  spread(key = compound, value = conc_ug_mg)
 
-lcms_complete_2017
+lcms_2018_wide <- lcms_2018 %>% 
+  select(-conc, -mg_tea) %>% 
+  spread(key = compound, value = conc_ug_mg)
 ```
+
+
+
+
 
 # Write data to rds
 
 ```{r}
-write_rds(lcms_complete_2017, here("data", "cleaned", "2017_lcms.rds"))
+write_rds(lcms_2017, here("data", "cleaned", "2017_lcms_tidy.rds"))
+write_rds(lcms_2017_wide, here("data", "cleaned", "2017_lcms_wide.rds"))
+write_rds(lcms_2018, here("data", "cleaned", "2018_lcms_tidy.rds"))
+write_rds(lcms_2018_wide, here("data", "cleaned", "2018_lcms_wide.rds"))
 ```
 
