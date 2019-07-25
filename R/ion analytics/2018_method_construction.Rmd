@@ -19,11 +19,12 @@ library(chemhelper)
 - New Alkane file (integration report)
 
 ```{r}
-RImaster <- read_csv("/Users/scottericr/Box/IonAnalytics/method_master RIs.csv")
+# RImaster <- read_csv("/Users/scottericr/Box/IonAnalytics/method_master RIs.csv")
+RImaster <- read_csv("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/method_master RIs.csv")
 
-oldmethod <- read_IA("/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv")
+# oldmethod <- read_IA("/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv")
 
-alkanes <- read_IA("/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix.D/Meth_073018_alkanemix Integration Report.csv")
+alkanes <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix/Meth_073018_alkanemix Integration Report.csv")
 ```
 
 # Make alkane table

@@ -1792,13 +1792,29 @@ library(chemhelper)</code></pre>
 </ul>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuUkltYXN0ZXIgPC0gcmVhZF9jc3YoXCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL21ldGhvZF9tYXN0ZXIgUklzLmNzdlwiKVxuXG5vbGRtZXRob2QgPC0gcmVhZF9JQShcIi9Vc2Vycy9zY290dGVyaWNyL0JveC9Jb25BbmFseXRpY3MvSW9uQW5hbHl0aWNzIFByb2plY3RzL0JBQ0UgMjAxNy9NZXRob2RzL0JBQ0VfTVMtU3VidHJhY3Rpb24vQkFDRV9NUy1TdWJ0cmFjdGlvbiBDb21wb3VuZHMgbGlzdC5jc3ZcIilcblxuYWxrYW5lcyA8LSByZWFkX0lBKFwiL1VzZXJzL3Njb3R0ZXJpY3IvQm94L0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvRGF0YS8wNzMwMThfYWxrYW5lbWl4LkQvTWV0aF8wNzMwMThfYWxrYW5lbWl4IEludGVncmF0aW9uIFJlcG9ydC5jc3ZcIilcbmBgYCJ9 -->
-<pre class="r"><code>RImaster &lt;- read_csv(&quot;/Users/scottericr/Box/IonAnalytics/method_master RIs.csv&quot;)
-
-oldmethod &lt;- read_IA(&quot;/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv&quot;)
-
-alkanes &lt;- read_IA(&quot;/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix.D/Meth_073018_alkanemix Integration Report.csv&quot;)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuUkltYXN0ZXIgPC0gcmVhZF9jc3YoXCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL21ldGhvZF9tYXN0ZXIgUklzLmNzdlwiKVxuYGBgIn0= -->
+<pre class="r"><code>RImaster &lt;- read_csv(&quot;/Users/scottericr/Box/IonAnalytics/method_master RIs.csv&quot;)</code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiUGFyc2VkIHdpdGggY29sdW1uIHNwZWNpZmljYXRpb246XG5jb2xzKFxuICBOby4gPSBcdTAwMWJbMzJtY29sX2RvdWJsZSgpXHUwMDFiWzM5bSxcbiAgQ29tcG91bmQgPSBcdTAwMWJbMzFtY29sX2NoYXJhY3RlcigpXHUwMDFiWzM5bSxcbiAgR3JvdXAgPSBcdTAwMWJbMzFtY29sX2NoYXJhY3RlcigpXHUwMDFiWzM5bSxcbiAgUklfZXhwID0gXHUwMDFiWzMybWNvbF9kb3VibGUoKVx1MDAxYlszOW0sXG4gIFJJX3R5cGUgPSBcdTAwMWJbMzFtY29sX2NoYXJhY3RlcigpXHUwMDFiWzM5bSxcbiAgQ0FTID0gXHUwMDFiWzMxbWNvbF9jaGFyYWN0ZXIoKVx1MDAxYlszOW0sXG4gIFJJX2xpdCA9IFx1MDAxYlszMm1jb2xfZG91YmxlKClcdTAwMWJbMzltLFxuICBSSV9yZWYgPSBcdTAwMWJbMzJtY29sX2RvdWJsZSgpXHUwMDFiWzM5bSxcbiAgUklfbmljb2xlID0gXHUwMDFiWzMybWNvbF9kb3VibGUoKVx1MDAxYlszOW1cbilcbiJ9 -->
+<pre><code>Parsed with column specification:
+cols(
+  No. = [32mcol_double()[39m,
+  Compound = [31mcol_character()[39m,
+  Group = [31mcol_character()[39m,
+  RI_exp = [32mcol_double()[39m,
+  RI_type = [31mcol_character()[39m,
+  CAS = [31mcol_character()[39m,
+  RI_lit = [32mcol_double()[39m,
+  RI_ref = [32mcol_double()[39m,
+  RI_nicole = [32mcol_double()[39m
+)</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxub2xkbWV0aG9kIDwtIHJlYWRfSUEoXCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9CQUNFIDIwMTcvTWV0aG9kcy9CQUNFX01TLVN1YnRyYWN0aW9uL0JBQ0VfTVMtU3VidHJhY3Rpb24gQ29tcG91bmRzIGxpc3QuY3N2XCIpXG5gYGAifQ== -->
+<pre class="r"><code>oldmethod &lt;- read_IA(&quot;/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv&quot;)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3I6ICcvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9CQUNFIDIwMTcvTWV0aG9kcy9CQUNFX01TLVN1YnRyYWN0aW9uL0JBQ0VfTVMtU3VidHJhY3Rpb24gQ29tcG91bmRzIGxpc3QuY3N2JyBkb2VzIG5vdCBleGlzdC5cbiJ9 -->
+<pre><code>Error: &#39;/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/BACE 2017/Methods/BACE_MS-Subtraction/BACE_MS-Subtraction Compounds list.csv&#39; does not exist.</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -1807,14 +1823,13 @@ alkanes &lt;- read_IA(&quot;/Users/scottericr/Box/IonAnalytics/IonAnalytics Proj
 <p>Look at alkanes available, add column of carbon number, use actual retention times whenever possible, otherwise use expected RTs.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYWxrYW5lc19uZXcgPC1cbiAgYWxrYW5lcyAlPiUgXG4gIHNsaWNlKDE6MTkpICU+JSAgI3RoYXQncyBlbm91Z2ggSSB0aGluay5cbiAgbXV0YXRlKHJ0ID0gaWZlbHNlKGBSLlRpbWUgW21pbi5dYCA9PSAwLCBgRXhwZWN0LiBbbWluLl1gLCBgUi5UaW1lIFttaW4uXWApKSAlPiUgXG4gIHNlbGVjdChDb21wb3VuZCwgcnQpICU+JSBcbiAgYWRkX2NvbHVtbihDX251bSA9IDY6MjQpXG5gYGAifQ== -->
-<pre class="r"><code>alkanes_new &lt;-
-  alkanes %&gt;% 
-  slice(1:19) %&gt;%  #that&#39;s enough I think.
-  mutate(rt = ifelse(`R.Time [min.]` == 0, `Expect. [min.]`, `R.Time [min.]`)) %&gt;% 
-  select(Compound, rt) %&gt;% 
-  add_column(C_num = 6:24)</code></pre>
-<!-- rnb-source-end -->
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbInRibF9kZiIsInRibCIsImRhdGEuZnJhbWUiXSwibmNvbCI6MywibnJvdyI6MTl9LCJyZGYiOiJINHNJQUFBQUFBQUFBMTFUVFdqVVFCU2VUUnJyeHJiWnVQVUg4YkRrcEljTmRMTzZXL3pwNkVZUUthMW9GNG9nRXZPanE3dVRKY2xpRVErZVpJK0NweXFLNkVVcmlBZnhFaEgxMUVPOTJwdFhUOVpEd1I2RVhkK2tFK2trOENiemZmUGV5L2ZldkZ3eUZ5dnlvb3dRRXBBb2lVZ1FZVHNpd0pKREl5aFAzMHNJaVVYWTBKTUNXSkVkS0ZONnZWNDY3eTVaeEQwNVZ6N042TEdLWGpHQTdrYkFNMjdYdkwwREtWVjkyaWpOK1lRUFZHcDZyVll5WFp1bmR6ZUprM0FwTm4wTzV4ZUNGa2ZzV1hDandPS3BpeTZKZUVxbXdubW5SRFB2UkhYekRKWE42em5Yc3YyUVMwTmNuZ0xKSEZhT0hkZXI5UklJNXlNVDRZeENhSUwyZW1Zd2VYZGo0L2NMbkZ1WFRkTjhodFUvUDV2TjVnZDg2SysydHZiTnc5cm1GOE13bnVNajhTeWNmOEo2K0Y3VHRCaFBiYTBDZm9lcmoxNEJmb2hyWXc4Z1Q0Q25uUXNRWitFVFQxY2gvMnQ4S2w1WFZmVXRudmw4WldYbHpWV012ejhCdjh2NHpOZWpjZnp4TUQ3N2NuNTUrYkdJRy9kdTlmdjlMV3pPRmp6UCt3R3g0OGtzd09XQ2pkSXE2V1hRRnRGUzZDQXdIMXFId21aSEJkdkw0aWJCOW9IdEJ6c0FkakF6ZVBuQXY2TVRxK09HTEpGd0g1YmhjUGdyNHlpbFRvVmtTbG5QRzM2bjYvZUl3N0FRUktsNzR4cnBkYkk1N0xZVnBqbFNVbmFzeU5LOUFOSURHbVJDUnYxdTFQSUpCQW0wSENrVG5Bc3lSS0ZIcUZDbmJOL3NrZHZsaXNGNmxVUGJ6empiRjNmc3hlMXZpa09XUzBwL0tKZmNhUDBmSEtsdFhYZmJERXhBMjVLRzZOMmdSZEtpWldCRFBmSWpLL1dUYmIrZE1rbHhhUEFQdWRFdi93MEVBQUE9In0= -->
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["Compound"],"name":[1],"type":["chr"],"align":["left"]},{"label":["rt"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["C_num"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"1.88 Hexane<N->","2":"1.880000","3":"6"},{"1":"2.23 Heptane","2":"2.230000","3":"7"},{"1":"Octane","2":"4.491117","3":"8"},{"1":"4.93 Nonane<N->","2":"6.745250","3":"9"},{"1":"7.77 Decane<N->","2":"9.476083","3":"10"},{"1":"Undecane","2":"12.365816","3":"11"},{"1":"Dodecane","2":"15.225984","3":"12"},{"1":"Tridecane","2":"17.967900","3":"13"},{"1":"Tetradecane","2":"20.576784","3":"14"},{"1":"Pentadecane","2":"23.048934","3":"15"},{"1":"Hexadecane","2":"25.391766","3":"16"},{"1":"Heptadecane","2":"27.616333","3":"17"},{"1":"Octadecane","2":"29.733750","3":"18"},{"1":"Nonadecane","2":"31.751383","3":"19"},{"1":"Eicosane","2":"33.676634","3":"20"},{"1":"Heneicosane","2":"35.516899","3":"21"},{"1":"Docosane","2":"37.275867","3":"22"},{"1":"56.48 Tricosane","2":"38.972001","3":"23"},{"1":"Tetracosane","2":"40.594250","3":"24"}],"options":{"columns":{"min":{},"max":[10],"total":[3]},"rows":{"min":[10],"max":[10],"total":[19]},"pages":{}}}
+  </script>
+</div>
+<!-- rnb-frame-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -1822,10 +1837,9 @@ alkanes &lt;- read_IA(&quot;/Users/scottericr/Box/IonAnalytics/IonAnalytics Proj
 <h1>Merge RIs with old method file</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2hlbmd6aG91IDwtIGxlZnRfam9pbihvbGRtZXRob2QsIHNlbGVjdChSSW1hc3RlciwgQ29tcG91bmQsIFJJX2V4cCkpXG5zaGVuZ3pob3VcbmFueU5BKHNoZW5nemhvdSRSSV9leHApXG5gYGAifQ== -->
-<pre class="r"><code>shengzhou &lt;- left_join(oldmethod, select(RImaster, Compound, RI_exp))
-shengzhou
-anyNA(shengzhou$RI_exp)</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBgclxuc2hlbmd6aG91IDwtIGxlZnRfam9pbihvbGRtZXRob2QsIHNlbGVjdChSSW1hc3RlciwgQ29tcG91bmQsIFJJX2V4cCkpXG5zaGVuZ3pob3VcbmFueU5BKHNoZW5nemhvdSRSSV9leHApXG5gYGBcbmBgYCJ9 -->
+<p><code>r</code>r shengzhou &lt;- left_join(oldmethod, select(RImaster, Compound, RI_exp)) shengzhou anyNA(shengzhou$RI_exp)</p>
+<pre><code></code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -1834,15 +1848,9 @@ anyNA(shengzhou$RI_exp)</code></pre>
 <h1>Back-calculate RTs from master RI file</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubWV0aG9kX25ldyA8LVxuICBzaGVuZ3pob3UgJT4lIFxuICBtdXRhdGUoUlRfZXhwID0gY2FsY19SVChSSV9leHAsIGFsa2FuZXNfbmV3JHJ0LCBhbGthbmVzX25ldyRDX251bSksXG4gICAgICAgICBmcm9tID0gUlRfZXhwIC0gMC41LFxuICAgICAgICAgdG8gPSBSVF9leHAgKyAwLjUsXG4gICAgICAgICBzdW1mcm9tID0gUlRfZXhwIC0gMSxcbiAgICAgICAgIHN1bXRvID0gUlRfZXhwICsgMSlcbm1ldGhvZF9uZXdcbmBgYCJ9 -->
-<pre class="r"><code>method_new &lt;-
-  shengzhou %&gt;% 
-  mutate(RT_exp = calc_RT(RI_exp, alkanes_new$rt, alkanes_new$C_num),
-         from = RT_exp - 0.5,
-         to = RT_exp + 0.5,
-         sumfrom = RT_exp - 1,
-         sumto = RT_exp + 1)
-method_new</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBgclxubWV0aG9kX25ldyA8LVxuICBzaGVuZ3pob3UgJT4lIFxuICBtdXRhdGUoUlRfZXhwID0gY2FsY19SVChSSV9leHAsIGFsa2FuZXNfbmV3JHJ0LCBhbGthbmVzX25ldyRDX251bSksXG4gICAgICAgICBmcm9tID0gUlRfZXhwIC0gMC41LFxuICAgICAgICAgdG8gPSBSVF9leHAgKyAwLjUsXG4gICAgICAgICBzdW1mcm9tID0gUlRfZXhwIC0gMSxcbiAgICAgICAgIHN1bXRvID0gUlRfZXhwICsgMSlcbm1ldGhvZF9uZXdcbmBgYFxuYGBgIn0= -->
+<p><code>r</code>r method_new &lt;- shengzhou %&gt;% mutate(RT_exp = calc_RT(RI_exp, alkanes_new<span class="math inline">\(rt, alkanes_new\)</span>C_num), from = RT_exp - 0.5, to = RT_exp + 0.5, sumfrom = RT_exp - 1, sumto = RT_exp + 1) method_new</p>
+<pre><code></code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -1856,9 +1864,78 @@ method_new</code></pre>
 <pre class="r"><code>write_csv(method_new, here(&quot;R&quot;, &quot;ion_analytics&quot;, &quot;2018_adjusted_method_RTs.csv&quot;))</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="adjusting-method-for-jin-guan-yin" class="section level1">
+<h1>Adjusting method for Jin Guan Yin</h1>
+<p>The Twisters for Longjing were run at a different time than the twisters for the Jin Guan Yin plants and there was instrument drift. I have alkane files for both runs. I’ve already made a bunch of changes to retention windows and settings for the Longjing method, so I want to copy it and only adjust the RTs while keeping the same window width and all that.</p>
+<div id="read-in-adjusted-longjing-method-and-both-alkane-files" class="section level2">
+<h2>Read in adjusted longjing method and both alkane files</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubGpfYWxrYW5lX3JhdyA8LSByZWFkX0lBKFwiL1ZvbHVtZXMvYXNfcnNjaF9vcmlhbnNsYWJfdGVhMDEkL0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvRGF0YS8wNzMwMThfYWxrYW5lbWl4L01ldGhfMDczMDE4X2Fsa2FuZW1peCBJbnRlZ3JhdGlvbiBSZXBvcnQuY3N2XCIpXG5cbmpneV9hbGthbmVfcmF3IDwtIHJlYWRfSUEoXCIvVm9sdW1lcy9hc19yc2NoX29yaWFuc2xhYl90ZWEwMSQvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9TaGVuZ3pob3VfMjAxOC9EYXRhLzA4MjAxOF9BbGthbmUvTWV0aF8wNzMwMThfYWxrYW5lbWl4IEludGVncmF0aW9uIFJlcG9ydC5jc3ZcIilcblxubGpfbWV0aG9kX2FkaiA8LSByZWFkX0lBKFwiL1ZvbHVtZXMvYXNfcnNjaF9vcmlhbnNsYWJfdGVhMDEkL0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvTWV0aG9kcy9TaGVuZ3pob3VfYWRqL1NoZW5nemhvdV9hZGogQ29tcG91bmRzIGxpc3QuY3N2XCIpXG5cbmxqX21ldGhvZF9hZGogJT4lIHN1bW1hcml6ZShtYXgoYFJldC5UaW1lIFttaW4uXWApKVxuYGBgIn0= -->
+<pre class="r"><code>lj_alkane_raw &lt;- read_IA(&quot;/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix/Meth_073018_alkanemix Integration Report.csv&quot;)
+
+jgy_alkane_raw &lt;- read_IA(&quot;/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/082018_Alkane/Meth_073018_alkanemix Integration Report.csv&quot;)
+
+lj_method_adj &lt;- read_IA(&quot;/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Methods/Shengzhou_adj/Shengzhou_adj Compounds list.csv&quot;)
+
+lj_method_adj %&gt;% summarize(max(`Ret.Time [min.]`))</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="make-alkane-tables" class="section level2">
+<h2>Make alkane tables</h2>
+<p>Look at alkanes available, add column of carbon number, use actual retention times whenever possible, otherwise use expected RTs.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-frame-begin eyJtZXRhZGF0YSI6eyJjbGFzc2VzIjpbInRibF9kZiIsInRibCIsImRhdGEuZnJhbWUiXSwibmNvbCI6MywibnJvdyI6MTl9LCJyZGYiOiJINHNJQUFBQUFBQUFBMTFUUFd6VFFCUysySFZEREsxclVuN1VBYUlNQ0FuRlV0UFFKQ3JRSzNFUlFxZ3RxSkU2SUNIak9HQkk3aXpiRVJVc3NKVVJOak5VZ2dtVkNRbXh3SUw0bWNxRzFLbXNpSUV5SWlHVThNNDlvNTR0dmZPOTc5NzM3bnZQejFmTmxiSzZvaUtFSkNRck1wSmsyQTVKc0dUUUVNcXg5eXBDY2g0MjdHUU1MTThQdEVtalZpdGNkRll0NHB4WktKM2o4SUd5VVo0QzJBc0I1OWp3b3IzSDB5cEdmYXF3UUlsSTFLcEd0Vm93SFZ1RTl6VkpLOFlTMzZTQ24xdjJYUUhZdit5RXZpVkNTdzRKUlVobHdzV2dXTE1ZeEhTTENKTXQ2cGwzYlJvSWFZZ2pRaUJaOExYVDAwYWxWZ0RoSWpNV3ppR0VSbG12Wi92ajkzWjJmajNIbVMzVk5NMTFySnUvbTgzbUd6eXg5SGx6ODR1Tml5K3lVZlFVNFpQQnRZMk5sOGV3Y2VyajJ0cWpDVHo1OWYzMjlyZEx1T0k5ZzNNVlQvOTRDTzhUdUQ1bnR0dnRQM2ptL3V0aXNmZ1duNDArNkxyK0RzK3VYd0QrSXNhZkhzTjlsL0hjcStQQWIrRHpUK2FqS1BxTEc3ZS9nMzhGbXpQRHdOOENiU1B4TE1ESEJjdXlLdG5IWUMxaXBiQkI0REdzRG8zUGpnNTJrUFBHd1E2QkhRWTdBblkwTlhnNW45NDFpTlYxQXA1SWVnRExZREQ0bVFwVWtxQ3hlRXA1enh1MDY5RWVhWEZmOHNNa3ZIR2Q5THJwSEhiSENwSWNDYWkyck5BeTJqNmtCNitmb21TcEY3cVVBRWxpNVNncGNzWlBBVnFQTUtHdGtuMnJSKzZVNnJ4VkdiVDdqUEI5ZnM5ZTNyMVNIdkJVU3ZJL09lU20rMzl1bEk1MXcrbHdaeFM2RnZmRDhIeVhKRFdyZ0FaR1NFTXJpVk50MmttUXVEYlUvd2NDNHdKekRBUUFBQT09In0= -->
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["Compound"],"name":[1],"type":["chr"],"align":["left"]},{"label":["rt"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["C_num"],"name":[3],"type":["int"],"align":["right"]}],"data":[{"1":"1.88 Hexane<N->","2":"1.880000","3":"6"},{"1":"2.23 Heptane","2":"2.230000","3":"7"},{"1":"Octane","2":"4.317350","3":"8"},{"1":"4.93 Nonane<N->","2":"6.578883","3":"9"},{"1":"7.77 Decane<N->","2":"9.328183","3":"10"},{"1":"Undecane","2":"12.225316","3":"11"},{"1":"Dodecane","2":"15.085484","3":"12"},{"1":"Tridecane","2":"17.831083","3":"13"},{"1":"Tetradecane","2":"20.439966","3":"14"},{"1":"Pentadecane","2":"22.912134","3":"15"},{"1":"Hexadecane","2":"25.254950","3":"16"},{"1":"Heptadecane","2":"27.483217","3":"17"},{"1":"Octadecane","2":"29.600633","3":"18"},{"1":"Nonadecane","2":"31.618266","3":"19"},{"1":"Eicosane","2":"33.543516","3":"20"},{"1":"Heneicosane","2":"35.383785","3":"21"},{"1":"Docosane","2":"37.142749","3":"22"},{"1":"56.48 Tricosane","2":"38.835201","3":"23"},{"1":"Tetracosane","2":"40.461133","3":"24"}],"options":{"columns":{"min":{},"max":[10],"total":[3]},"rows":{"min":[10],"max":[10],"total":[19]},"pages":{}}}
+  </script>
+</div>
+<!-- rnb-frame-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="calculate-ris-from-old-method-file-and-new-rts-from-new-alkane-file" class="section level2">
+<h2>Calculate RIs from old method file and new RTs from new alkane file</h2>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuamd5X21ldGhvZF9hZGogPC1cbiAgbGpfbWV0aG9kX2FkaiAlPiVcbiAgbXV0YXRlKFJJID0gY2FsY19SSShgUmV0LlRpbWUgW21pbi5dYCwgbGpfYWxrYW5lJHJ0LCBsal9hbGthbmUkQ19udW0pKSAlPiUgI2NhbGMgUkkgYmFzZWQgb24gYWxrYW5lIGZpbGVcbiAgbXV0YXRlKFJUX2FkaiA9IGNhbGNfUlQoUkksIGpneV9hbGthbmUkcnQsIGpneV9hbGthbmUkQ19udW0pKSAlPiUgI2FkanVzdCBSVCBiYXNlZCBvbiBuZXcgYWxrYW5lc1xuICBtdXRhdGUoaGFsZl93aW5kb3cgPSByb3VuZChgLi4udG8gW21pbi5dYCAtIGBSZXQuVGltZSBbbWluLl1gLCAzKSwgI2tlZXAgaW50ZWdyYXRpb24gd2luZG93IHNpemVcbiAgICAgICAgIGZyb21fYWRqID0gUlRfYWRqIC0gaGFsZl93aW5kb3csXG4gICAgICAgICB0b19hZGogPSBSVF9hZGogKyBoYWxmX3dpbmRvdykgJT4lIFxuICBzZWxlY3QoTm8uLCBDb21wb3VuZCwgUlRfYWRqLCBmcm9tX2FkaiwgdG9fYWRqKSAjb3JkZXIgY29sdW1ucyB0byBtYWtlIGZvciBlYXNpZXIgY29weWluZyBhbmQgcGFzdGluZ1xuYGBgIn0= -->
+<pre class="r"><code>jgy_method_adj &lt;-
+  lj_method_adj %&gt;%
+  mutate(RI = calc_RI(`Ret.Time [min.]`, lj_alkane$rt, lj_alkane$C_num)) %&gt;% #calc RI based on alkane file
+  mutate(RT_adj = calc_RT(RI, jgy_alkane$rt, jgy_alkane$C_num)) %&gt;% #adjust RT based on new alkanes
+  mutate(half_window = round(`...to [min.]` - `Ret.Time [min.]`, 3), #keep integration window size
+         from_adj = RT_adj - half_window,
+         to_adj = RT_adj + half_window) %&gt;% 
+  select(No., Compound, RT_adj, from_adj, to_adj) #order columns to make for easier copying and pasting</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+</div>
+<div id="write-to-csv" class="section level2">
+<h2>Write to CSV</h2>
+<p>Write this to csv then copy and paste into a copy of the method used for Long Jing samples.</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxud3JpdGVfY3N2KGpneV9tZXRob2RfYWRqLCBoZXJlKFwiUlwiLCBcImlvbiBhbmFseXRpY3NcIiwgXCIyMDE4X2FkanVzdGVkX21ldGhvZF9SVHNfSkdZLmNzdlwiKSlcblxuYGBgIn0= -->
+<pre class="r"><code>write_csv(jgy_method_adj, here(&quot;R&quot;, &quot;ion analytics&quot;, &quot;2018_adjusted_method_RTs_JGY.csv&quot;))
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiRXJyb3IgaW4gaXMuZGF0YS5mcmFtZSh4KSA6IG9iamVjdCAnamd5X21ldGhvZF9hZGonIG5vdCBmb3VuZFxuIn0= -->
+<pre><code>Error in is.data.frame(x) : object &#39;jgy_method_adj&#39; not found</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+</div>
 </div>
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiTWV0aG9kIGZpbGUgY29uc3RydWN0aW9uIGZvciAyMDE4IFNoZW5nemhvdSBEQ1NFIGV4cGVyaW1lbnQiCm91dHB1dDogaHRtbF9ub3RlYm9vawotLS0KIyBTdGFydCBQcm9qZWN0CkZpcnN0LCBzdGFydCBhIG5ldyBwcm9qZWN0IGluIElvbiBBbmFseXRpY3MuICBJbXBvcnQgdGhlIGFsa2FuZSBtaXggLkQgZmlsZSBhbmQgZWl0aGVyIGltcG9ydCBhIHByZXZpb3VzIGFsa2FuZSBtZXRob2Qgb3IgY3JlYXRlIG9uZSB1c2luZyBhdXRvbWF0ZWQgbWV0aG9kIGNvbnN0cnVjdGlvbi4gIFJ1biB0aGUgbWV0aG9kIG9uIHRoZSBhbGthbmUgZmlsZSwgYW5kIGV4cG9ydCB0aGUgcmVzdWx0cyBmcm9tIHRoZSBpbnRlZ3JhdGlvbiByZXBvcnQgdGFiLgoKIyBMb2FkIHBhY2thZ2VzCmBgYHtyfQpsaWJyYXJ5KHRpZHl2ZXJzZSkKbGlicmFyeShoZXJlKQpsaWJyYXJ5KGNoZW1oZWxwZXIpCmBgYAoKIyBMb2FkIGZpbGVzCgotIE1hc3RlciBsaXN0IG9mIFJJcwotIE9sZCBtZXRob2QgZmlsZSAoQ29tcG91bmQgTGlzdCkKLSBOZXcgQWxrYW5lIGZpbGUgKGludGVncmF0aW9uIHJlcG9ydCkKCmBgYHtyfQpSSW1hc3RlciA8LSByZWFkX2NzdigiL1VzZXJzL3Njb3R0ZXJpY3IvQm94L0lvbkFuYWx5dGljcy9tZXRob2RfbWFzdGVyIFJJcy5jc3YiKQoKb2xkbWV0aG9kIDwtIHJlYWRfSUEoIi9Vc2Vycy9zY290dGVyaWNyL0JveC9Jb25BbmFseXRpY3MvSW9uQW5hbHl0aWNzIFByb2plY3RzL0JBQ0UgMjAxNy9NZXRob2RzL0JBQ0VfTVMtU3VidHJhY3Rpb24vQkFDRV9NUy1TdWJ0cmFjdGlvbiBDb21wb3VuZHMgbGlzdC5jc3YiKQoKYWxrYW5lcyA8LSByZWFkX0lBKCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9TaGVuZ3pob3VfMjAxOC9EYXRhLzA3MzAxOF9hbGthbmVtaXguRC9NZXRoXzA3MzAxOF9hbGthbmVtaXggSW50ZWdyYXRpb24gUmVwb3J0LmNzdiIpCmBgYAoKIyBNYWtlIGFsa2FuZSB0YWJsZQpMb29rIGF0IGFsa2FuZXMgYXZhaWxhYmxlLCBhZGQgY29sdW1uIG9mIGNhcmJvbiBudW1iZXIsIHVzZSBhY3R1YWwgcmV0ZW50aW9uIHRpbWVzIHdoZW5ldmVyIHBvc3NpYmxlLCBvdGhlcndpc2UgdXNlIGV4cGVjdGVkIFJUcy4KCmBgYHtyfQphbGthbmVzX25ldyA8LQogIGFsa2FuZXMgJT4lIAogIHNsaWNlKDE6MTkpICU+JSAgI3RoYXQncyBlbm91Z2ggSSB0aGluay4KICBtdXRhdGUocnQgPSBpZmVsc2UoYFIuVGltZSBbbWluLl1gID09IDAsIGBFeHBlY3QuIFttaW4uXWAsIGBSLlRpbWUgW21pbi5dYCkpICU+JSAKICBzZWxlY3QoQ29tcG91bmQsIHJ0KSAlPiUgCiAgYWRkX2NvbHVtbihDX251bSA9IDY6MjQpCmBgYAoKIyBNZXJnZSBSSXMgd2l0aCBvbGQgbWV0aG9kIGZpbGUKCmBgYHtyfQpzaGVuZ3pob3UgPC0gbGVmdF9qb2luKG9sZG1ldGhvZCwgc2VsZWN0KFJJbWFzdGVyLCBDb21wb3VuZCwgUklfZXhwKSkKc2hlbmd6aG91CmFueU5BKHNoZW5nemhvdSRSSV9leHApCmBgYAoKIyBCYWNrLWNhbGN1bGF0ZSBSVHMgZnJvbSBtYXN0ZXIgUkkgZmlsZQoKYGBge3J9Cm1ldGhvZF9uZXcgPC0KICBzaGVuZ3pob3UgJT4lIAogIG11dGF0ZShSVF9leHAgPSBjYWxjX1JUKFJJX2V4cCwgYWxrYW5lc19uZXckcnQsIGFsa2FuZXNfbmV3JENfbnVtKSwKICAgICAgICAgZnJvbSA9IFJUX2V4cCAtIDAuNSwKICAgICAgICAgdG8gPSBSVF9leHAgKyAwLjUsCiAgICAgICAgIHN1bWZyb20gPSBSVF9leHAgLSAxLAogICAgICAgICBzdW10byA9IFJUX2V4cCArIDEpCm1ldGhvZF9uZXcKYGBgCgojIFdyaXRlIHRvIGZpbGUgZm9yIGNvcHktcGFzdGluZyBpbnRvIElvbkFuYWx5dGljcwoKSW1wb3J0IHRoZSBzYW1lIG1ldGhvZHMgZmlsZSB5b3UgdXNlZCBhcyBgb2xkbWV0aG9kYCBpbnRvIHlvdXIgbmV3IElBIHByb2plY3QuICBPcGVuIGl0IHVwIGFuZCBjb3B5IGFuZCBwYXN0ZSB0aGVzZSB2YWx1ZXMuCgpgYGB7cn0Kd3JpdGVfY3N2KG1ldGhvZF9uZXcsIGhlcmUoIlIiLCAiaW9uX2FuYWx5dGljcyIsICIyMDE4X2FkanVzdGVkX21ldGhvZF9SVHMuY3N2IikpCmBgYA==</div>
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiTWV0aG9kIGZpbGUgY29uc3RydWN0aW9uIGZvciAyMDE4IFNoZW5nemhvdSBEQ1NFIGV4cGVyaW1lbnQiCm91dHB1dDogaHRtbF9ub3RlYm9vawotLS0KIyBTdGFydCBQcm9qZWN0CkZpcnN0LCBzdGFydCBhIG5ldyBwcm9qZWN0IGluIElvbiBBbmFseXRpY3MuICBJbXBvcnQgdGhlIGFsa2FuZSBtaXggLkQgZmlsZSBhbmQgZWl0aGVyIGltcG9ydCBhIHByZXZpb3VzIGFsa2FuZSBtZXRob2Qgb3IgY3JlYXRlIG9uZSB1c2luZyBhdXRvbWF0ZWQgbWV0aG9kIGNvbnN0cnVjdGlvbi4gIFJ1biB0aGUgbWV0aG9kIG9uIHRoZSBhbGthbmUgZmlsZSwgYW5kIGV4cG9ydCB0aGUgcmVzdWx0cyBmcm9tIHRoZSBpbnRlZ3JhdGlvbiByZXBvcnQgdGFiLgoKIyBMb2FkIHBhY2thZ2VzCmBgYHtyfQpsaWJyYXJ5KHRpZHl2ZXJzZSkKbGlicmFyeShoZXJlKQpsaWJyYXJ5KGNoZW1oZWxwZXIpCmBgYAoKIyBMb2FkIGZpbGVzCgotIE1hc3RlciBsaXN0IG9mIFJJcwotIE9sZCBtZXRob2QgZmlsZSAoQ29tcG91bmQgTGlzdCkKLSBOZXcgQWxrYW5lIGZpbGUgKGludGVncmF0aW9uIHJlcG9ydCkKCmBgYHtyfQojIFJJbWFzdGVyIDwtIHJlYWRfY3N2KCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL21ldGhvZF9tYXN0ZXIgUklzLmNzdiIpClJJbWFzdGVyIDwtIHJlYWRfY3N2KCIvVm9sdW1lcy9hc19yc2NoX29yaWFuc2xhYl90ZWEwMSQvSW9uQW5hbHl0aWNzL21ldGhvZF9tYXN0ZXIgUklzLmNzdiIpCgojIG9sZG1ldGhvZCA8LSByZWFkX0lBKCIvVXNlcnMvc2NvdHRlcmljci9Cb3gvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9CQUNFIDIwMTcvTWV0aG9kcy9CQUNFX01TLVN1YnRyYWN0aW9uL0JBQ0VfTVMtU3VidHJhY3Rpb24gQ29tcG91bmRzIGxpc3QuY3N2IikKCmFsa2FuZXMgPC0gcmVhZF9JQSgiL1ZvbHVtZXMvYXNfcnNjaF9vcmlhbnNsYWJfdGVhMDEkL0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvRGF0YS8wNzMwMThfYWxrYW5lbWl4L01ldGhfMDczMDE4X2Fsa2FuZW1peCBJbnRlZ3JhdGlvbiBSZXBvcnQuY3N2IikKYGBgCgojIE1ha2UgYWxrYW5lIHRhYmxlCkxvb2sgYXQgYWxrYW5lcyBhdmFpbGFibGUsIGFkZCBjb2x1bW4gb2YgY2FyYm9uIG51bWJlciwgdXNlIGFjdHVhbCByZXRlbnRpb24gdGltZXMgd2hlbmV2ZXIgcG9zc2libGUsIG90aGVyd2lzZSB1c2UgZXhwZWN0ZWQgUlRzLgoKYGBge3J9CmFsa2FuZXNfbmV3IDwtCiAgYWxrYW5lcyAlPiUgCiAgc2xpY2UoMToxOSkgJT4lICAjdGhhdCdzIGVub3VnaCBJIHRoaW5rLgogIG11dGF0ZShydCA9IGlmZWxzZShgUi5UaW1lIFttaW4uXWAgPT0gMCwgYEV4cGVjdC4gW21pbi5dYCwgYFIuVGltZSBbbWluLl1gKSkgJT4lIAogIHNlbGVjdChDb21wb3VuZCwgcnQpICU+JSAKICBhZGRfY29sdW1uKENfbnVtID0gNjoyNCkKYGBgCgojIE1lcmdlIFJJcyB3aXRoIG9sZCBtZXRob2QgZmlsZQoKYGBge3J9CnNoZW5nemhvdSA8LSBsZWZ0X2pvaW4ob2xkbWV0aG9kLCBzZWxlY3QoUkltYXN0ZXIsIENvbXBvdW5kLCBSSV9leHApKQpzaGVuZ3pob3UKYW55TkEoc2hlbmd6aG91JFJJX2V4cCkKYGBgCgojIEJhY2stY2FsY3VsYXRlIFJUcyBmcm9tIG1hc3RlciBSSSBmaWxlCgpgYGB7cn0KbWV0aG9kX25ldyA8LQogIHNoZW5nemhvdSAlPiUgCiAgbXV0YXRlKFJUX2V4cCA9IGNhbGNfUlQoUklfZXhwLCBhbGthbmVzX25ldyRydCwgYWxrYW5lc19uZXckQ19udW0pLAogICAgICAgICBmcm9tID0gUlRfZXhwIC0gMC41LAogICAgICAgICB0byA9IFJUX2V4cCArIDAuNSwKICAgICAgICAgc3VtZnJvbSA9IFJUX2V4cCAtIDEsCiAgICAgICAgIHN1bXRvID0gUlRfZXhwICsgMSkKbWV0aG9kX25ldwpgYGAKCiMgV3JpdGUgdG8gZmlsZSBmb3IgY29weS1wYXN0aW5nIGludG8gSW9uQW5hbHl0aWNzCgpJbXBvcnQgdGhlIHNhbWUgbWV0aG9kcyBmaWxlIHlvdSB1c2VkIGFzIGBvbGRtZXRob2RgIGludG8geW91ciBuZXcgSUEgcHJvamVjdC4gIE9wZW4gaXQgdXAgYW5kIGNvcHkgYW5kIHBhc3RlIHRoZXNlIHZhbHVlcy4KCmBgYHtyfQp3cml0ZV9jc3YobWV0aG9kX25ldywgaGVyZSgiUiIsICJpb25fYW5hbHl0aWNzIiwgIjIwMThfYWRqdXN0ZWRfbWV0aG9kX1JUcy5jc3YiKSkKYGBgCgoKIyBBZGp1c3RpbmcgbWV0aG9kIGZvciBKaW4gR3VhbiBZaW4KClRoZSBUd2lzdGVycyBmb3IgTG9uZ2ppbmcgd2VyZSBydW4gYXQgYSBkaWZmZXJlbnQgdGltZSB0aGFuIHRoZSB0d2lzdGVycyBmb3IgdGhlIEppbiBHdWFuIFlpbiBwbGFudHMgYW5kIHRoZXJlIHdhcyBpbnN0cnVtZW50IGRyaWZ0LiAgSSBoYXZlIGFsa2FuZSBmaWxlcyBmb3IgYm90aCBydW5zLiAgSSd2ZSBhbHJlYWR5IG1hZGUgYSBidW5jaCBvZiBjaGFuZ2VzIHRvIHJldGVudGlvbiB3aW5kb3dzIGFuZCBzZXR0aW5ncyBmb3IgdGhlIExvbmdqaW5nIG1ldGhvZCwgc28gSSB3YW50IHRvIGNvcHkgaXQgYW5kIG9ubHkgYWRqdXN0IHRoZSBSVHMgd2hpbGUga2VlcGluZyB0aGUgc2FtZSB3aW5kb3cgd2lkdGggYW5kIGFsbCB0aGF0LgoKIyMgUmVhZCBpbiBhZGp1c3RlZCBsb25namluZyBtZXRob2QgYW5kIGJvdGggYWxrYW5lIGZpbGVzCgpgYGB7cn0KbGpfYWxrYW5lX3JhdyA8LSByZWFkX0lBKCIvVm9sdW1lcy9hc19yc2NoX29yaWFuc2xhYl90ZWEwMSQvSW9uQW5hbHl0aWNzL0lvbkFuYWx5dGljcyBQcm9qZWN0cy9TaGVuZ3pob3VfMjAxOC9EYXRhLzA3MzAxOF9hbGthbmVtaXgvTWV0aF8wNzMwMThfYWxrYW5lbWl4IEludGVncmF0aW9uIFJlcG9ydC5jc3YiKQoKamd5X2Fsa2FuZV9yYXcgPC0gcmVhZF9JQSgiL1ZvbHVtZXMvYXNfcnNjaF9vcmlhbnNsYWJfdGVhMDEkL0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvRGF0YS8wODIwMThfQWxrYW5lL01ldGhfMDczMDE4X2Fsa2FuZW1peCBJbnRlZ3JhdGlvbiBSZXBvcnQuY3N2IikKCmxqX21ldGhvZF9hZGogPC0gcmVhZF9JQSgiL1ZvbHVtZXMvYXNfcnNjaF9vcmlhbnNsYWJfdGVhMDEkL0lvbkFuYWx5dGljcy9Jb25BbmFseXRpY3MgUHJvamVjdHMvU2hlbmd6aG91XzIwMTgvTWV0aG9kcy9TaGVuZ3pob3VfYWRqL1NoZW5nemhvdV9hZGogQ29tcG91bmRzIGxpc3QuY3N2IikKCmxqX21ldGhvZF9hZGogJT4lIHN1bW1hcml6ZShtYXgoYFJldC5UaW1lIFttaW4uXWApKQpgYGAKCiMjIE1ha2UgYWxrYW5lIHRhYmxlcwpMb29rIGF0IGFsa2FuZXMgYXZhaWxhYmxlLCBhZGQgY29sdW1uIG9mIGNhcmJvbiBudW1iZXIsIHVzZSBhY3R1YWwgcmV0ZW50aW9uIHRpbWVzIHdoZW5ldmVyIHBvc3NpYmxlLCBvdGhlcndpc2UgdXNlIGV4cGVjdGVkIFJUcy4KCmBgYHtyfQpsal9hbGthbmUgPC0KICBsal9hbGthbmVfcmF3ICU+JSAKICBzbGljZSgxOjE5KSAlPiUgICN0aGF0J3MgZW5vdWdoIEkgdGhpbmsuCiAgbXV0YXRlKHJ0ID0gaWZlbHNlKGBSLlRpbWUgW21pbi5dYCA9PSAwLCBgRXhwZWN0LiBbbWluLl1gLCBgUi5UaW1lIFttaW4uXWApKSAlPiUgCiAgc2VsZWN0KENvbXBvdW5kLCBydCkgJT4lIAogIGFkZF9jb2x1bW4oQ19udW0gPSA2OjI0KQoKamd5X2Fsa2FuZSA8LQogIGpneV9hbGthbmVfcmF3ICU+JSAKICBzbGljZSgxOjE5KSAlPiUgICN0aGF0J3MgZW5vdWdoIEkgdGhpbmsuCiAgbXV0YXRlKHJ0ID0gaWZlbHNlKGBSLlRpbWUgW21pbi5dYCA9PSAwLCBgRXhwZWN0LiBbbWluLl1gLCBgUi5UaW1lIFttaW4uXWApKSAlPiUgCiAgc2VsZWN0KENvbXBvdW5kLCBydCkgJT4lIAogIGFkZF9jb2x1bW4oQ19udW0gPSA2OjI0KQpgYGAKCiMjIENhbGN1bGF0ZSBSSXMgZnJvbSBvbGQgbWV0aG9kIGZpbGUgYW5kIG5ldyBSVHMgZnJvbSBuZXcgYWxrYW5lIGZpbGUKCmBgYHtyfQpqZ3lfbWV0aG9kX2FkaiA8LQogIGxqX21ldGhvZF9hZGogJT4lCiAgbXV0YXRlKFJJID0gY2FsY19SSShgUmV0LlRpbWUgW21pbi5dYCwgbGpfYWxrYW5lJHJ0LCBsal9hbGthbmUkQ19udW0pKSAlPiUgI2NhbGMgUkkgYmFzZWQgb24gYWxrYW5lIGZpbGUKICBtdXRhdGUoUlRfYWRqID0gY2FsY19SVChSSSwgamd5X2Fsa2FuZSRydCwgamd5X2Fsa2FuZSRDX251bSkpICU+JSAjYWRqdXN0IFJUIGJhc2VkIG9uIG5ldyBhbGthbmVzCiAgbXV0YXRlKGhhbGZfd2luZG93ID0gcm91bmQoYC4uLnRvIFttaW4uXWAgLSBgUmV0LlRpbWUgW21pbi5dYCwgMyksICNrZWVwIGludGVncmF0aW9uIHdpbmRvdyBzaXplCiAgICAgICAgIGZyb21fYWRqID0gUlRfYWRqIC0gaGFsZl93aW5kb3csCiAgICAgICAgIHRvX2FkaiA9IFJUX2FkaiArIGhhbGZfd2luZG93KSAlPiUgCiAgc2VsZWN0KE5vLiwgQ29tcG91bmQsIFJUX2FkaiwgZnJvbV9hZGosIHRvX2FkaikgI29yZGVyIGNvbHVtbnMgdG8gbWFrZSBmb3IgZWFzaWVyIGNvcHlpbmcgYW5kIHBhc3RpbmcKYGBgCgojIyBXcml0ZSB0byBDU1YKV3JpdGUgdGhpcyB0byBjc3YgdGhlbiBjb3B5IGFuZCBwYXN0ZSBpbnRvIGEgY29weSBvZiB0aGUgbWV0aG9kIHVzZWQgZm9yIExvbmcgSmluZyBzYW1wbGVzLgoKYGBge3J9CndyaXRlX2NzdihqZ3lfbWV0aG9kX2FkaiwgaGVyZSgiUiIsICJpb24gYW5hbHl0aWNzIiwgIjIwMThfYWRqdXN0ZWRfbWV0aG9kX1JUc19KR1kuY3N2IikpCmBgYAoK</div>
 
 
 
