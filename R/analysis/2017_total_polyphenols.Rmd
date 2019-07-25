@@ -1,5 +1,5 @@
 ---
-title: "Total polyphenols"
+title: "2017 Total Polyphenols"
 output: 
   html_notebook: 
     toc: yes
