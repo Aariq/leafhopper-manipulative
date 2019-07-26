@@ -49,6 +49,8 @@ alkanes_jgy <-
 ```{r}
 cresol311 <- as.cas("106445")
 cresol416 <- as.cas("93516")
+cedr <- as.cas(469614)
+terp <- as.cas(562743)
 
 cresol311.ri <- nist_ri(cresol311, "linear", "non-polar", "ramp") %>% 
   filter(gas == "Helium", str_detect(phase, "5"), thickness < 0.3) %>% 
@@ -64,5 +66,16 @@ cresol416.ri <- nist_ri(cresol416, "linear", "non-polar", "custom") %>%
   summarize(mean_ri = mean(RI))
 
 cresol416.rt.lj <- calc_RT(1193.025, alkanes_lj$rt, alkanes_lj$C_num)
+
+cedr.ri <- nist_ri(cedr, 'linear', 'non-polar', 'ramp') %>% 
+  filter(gas == "Helium", str_detect(phase, "5")) %>% 
+  summarize(mean_ri = mean(RI))
+
+calc_RT(cedr.ri$mean_ri[1], alkanes_jgy$rt, alkanes_jgy$C_num)
+
+terp.ri <- nist_ri(terp, 'linear', 'non-polar', 'ramp') %>% 
+  filter(gas == "Helium", str_detect(phase, "5")) %>% 
+  summarize(mean_ri = mean(RI))
+calc_RT(terp.ri$mean_ri[1], alkanes_lj$rt, alkanes_lj$C_num)
 ```
 
