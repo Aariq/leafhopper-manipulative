@@ -1,0 +1,116 @@
+---
+title: "LCMS analysis"
+author: "Eric R. Scott"
+date: "2019-07-26"
+output: 
+  html_notebook: 
+    highlight: kate
+    theme: yeti
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Last compiled: `r Sys.Date()`*
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(here)
+library(ropls)
+library(chemhelper)
+library(naniar)
+library(visdat)
+```
+
+# Purpose
+
+Analysis of LCMS data from 2017 and 2018 leafhopper density experiments.
+
+# Load Data
+
+```{r data, echo=TRUE}
+lc2017 <- read_rds(here("data", "cleaned", "2017_lcms_wide.rds")) %>% 
+  filter(sample != "Q2") #determined elsewhere that this has an unusually high ammount of damage for the treatment
+lc2018 <- read_rds(here("data", "cleaned", "2018_lcms_wide.rds"))
+```
+
+## Data Dictionary
+
+`lc2017` and `lc2018`: Wide versions of LCMS data for both years with compounds as columns.
+
+- `sample`: sample name
+- `cultivar`: Q = Qing Xin Da Mao, L = Long Jing, J = Jin Guan Yin
+- `plant_num`: another identifier, extracted from sample name
+- `mean_leaf_area_px`: mean leaf area in pixels
+- `mean_percent_damage`: mean percent area damaged
+- `n_leaves`: number of leaves scanned and ground into powder for this analysis
+- `twister_damage`: percent damage on the twister leaf.  Ignore for LCMS analysis.
+- `density_treatmetn`: categorical.  This was the leafhopper density I aimed to treat the plants with in insects/young leaf for 2017 and insects/shoot in 2018
+- `density_start`, `density_end`: The density of leafhoppers at the start and end of the experiments.  In insects/young leaf in 2017 and insects/shoot in 2018
+- The rest of the columns are concentrations of compounds in **µg/mg** leaf
+
+# Analysis
+## Deal with NAs
+
+NAs are non-detects.  I should replace them with 0 or a very small number.
+
+```{r}
+vis_dat(lc2017)
+```
+
+
+```{r}
+lc2017_2 <- lc2017 %>% 
+  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
+  select(-`Catechin gallate`) #all zeroes
+```
+
+## Examine correlations
+
+```{r}
+corrr::correlate(lc2017_2[11:23]) %>% 
+  corrr::shave() %>% 
+  corrr::rplot() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+There are some strong correlations, so multivariate methods are probably best.
+
+## 2017 PCA
+
+```{r}
+X <- lc2017_2[11:23]
+
+opls(X, printL = FALSE)
+```
+
+## 2017 PLSR
+
+No significant relationship between density or damage and metabolites. High R2Y, but very low Q2.  Overfitting?  Maybe if I remove some of the metabolites with a LOT of NAs?
+
+```{r}
+try(opls(X, lc2017_2$density_end))
+opls(X, lc2017_2$mean_percent_damage, permI = 500, plotL = FALSE, printL = FALSE)
+```
+
+
+
+## Regression analysis
+
+Ok, new approach.  Let's just do linear regressions?  Best way would be to load in the **tidy** versions of the data, do the same filtering (remove Q2, etc.), and then use `purrr` or something from `tidymodels` to do all the regressions.
+
+```{r}
+lc2017_2
+
+caf <- lm(Caffeine ~ mean_percent_damage, data = lc2017_2)
+summary(caf)
+car::Anova(caf)
+
+c <- lm(Catechin ~ mean_percent_damage, data = lc2017_2)
+car::Anova(c)
+
+
+```
+

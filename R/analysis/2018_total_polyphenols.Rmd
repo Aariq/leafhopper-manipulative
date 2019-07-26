@@ -39,6 +39,8 @@ tp2 <-
   full_join(damage, by = "sample") %>%
   select(-leaf_density) #identical to `density_end`
 tp2
+
+count(tp2, cultivar)
 ```
 
 - sample: cultivar and sample ID. Q = qing xin da mao
