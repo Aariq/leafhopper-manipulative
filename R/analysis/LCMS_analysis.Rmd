@@ -26,6 +26,7 @@ library(visdat)
 library(broom)
 library(modelr)
 library(glue)
+library(cowplot)
 ```
 
 # Purpose
@@ -129,8 +130,6 @@ car::Anova(c)
 
 ```
 ```{r}
-
-
 results <-
   lc2017_tidy %>% 
   select(sample, compound, conc_ug_mg, mean_percent_damage, density_end) %>% 
@@ -142,20 +141,16 @@ results <-
   select(compound, data, lm, poly, null) %>% 
   gather(-compound, -data, key = model.type, value = model) %>% 
   mutate(stats = map(model, glance)) %>%
-  unnest(stats) %>% 
+  unnest(stats) %>%
+  group_by(compound) %>% 
   arrange(compound, AIC) %>% 
+  mutate(dAIC =  nth(AIC, 3)- AIC,
+         dDF = nth(df, 3) - df) %>% #calculate dAIC
   # filter(p.value < 0.2) %>%
-  select(compound, model.type, AIC, p.value, everything())
-  
+  select(compound, model.type, dAIC, dDF, p.value, everything())
 
-# #this also works
-# results <- lc2017_tidy %>% 
-#   group_by(compound) %>%
-#   do(tidy(lm(conc_ug_mg ~ mean_percent_damage, .))) %>% 
-#   ungroup() %>% 
-#   mutate(p.adj.fdr = p.adjust(p.value, "fdr")) #%>% 
-#   # filter(term == "mean_percent_damage", p.adj.fdr < 0.2)
 results
+
 ```
 
 Looks like EGCG has a pretty strong significant negative relationship with damage.  Makes sense as EGCG would be converted into theaflavins and other polymerized compounds.
@@ -173,30 +168,57 @@ Looks like EGCG has a pretty strong significant negative relationship with damag
 - Paraxanthine: null
 - Theobromine: linear, **p = 0.05**
 - Theophylline: null
-```{r}
-results2 <- results %>% 
-  filter(compound == "Caffeine" & model.type == "lm" |
-         compound == "Catechin" & model.type == "poly" |
-         compound == "Epicatechin" & model.type == "poly" |
-         compound == "Epicatechin gallate" & model.type == "lm" |
-         compound == "Epigallocatechin gallate" & model.type == "lm" |
-         compound == "Gallocatechin gallate" & model.type == "lm" |
-         compound == "Theobromine" & model.type == "lm")
-```
+
+### Plotting results
+
+First, creating a dataframe with only the "winning" models:
 
 ```{r}
-lc2017_tidy %>% 
-  filter(compound %in% results$compound) %>% 
-  ggplot(aes(x = mean_percent_damage, y = conc_ug_mg, color = compound)) +
+results2 <-
+  results %>% 
+  filter(
+    compound == "Caffeine" & model.type == "lm" |
+      compound == "Catechin" & model.type == "poly" |
+      compound == "Epicatechin" & model.type == "poly" |
+      compound == "Epicatechin gallate" & model.type == "lm" |
+      compound == "Epigallocatechin" & model.type == "null" |
+      compound == "Epigallocatechin gallate" & model.type == "lm" |
+      compound == "Gallic acid" & model.type == "null" |
+      compound == "Gallocatechin" & model.type == "null" |
+      compound == "Gallocatechin gallate" & model.type == "lm" |
+      compound == "L-theanine" & model.type == "null" |
+      compound == "Paraxanthine" & model.type == "null" |
+      compound == "Theobromine" & model.type == "lm" |
+      compound == "Theophylline" & model.type == "null"
+  )
+```
+
+#### plot with facet_wrap()
+
+Using `facet_wrap()` and two `geom_smooth()`s.  Pros: easier to read code.  Cons: more difficult to annotate with p-values? Maybe a custom labeller function?
+
+```{r}
+df <- full_join(lc2017_tidy, select(results2, compound, model.type, p.value))
+
+
+lc2017_plot <-
+  ggplot(df, aes(x = mean_percent_damage, y = conc_ug_mg)) +
   geom_point() +
-  geom_smooth(method = "lm") +
+  geom_smooth(method = "lm", data = filter(df, model.type == "lm")) +
+  geom_smooth(method = "lm", formula = "y ~ poly(x,2)", data = filter(df, model.type == "poly")) +
   facet_wrap(~compound, scales = "free_y") +
-  theme(legend.position = "none") +
   labs(x = "Mean % damaged leaf area",
-       y = "Concentration (µg/mg)")
+       y = "Concentration (µg/mg)",
+       subtitle = "2017") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+save_plot(here('figs', 'lc2017_plot.png'), lc2017_plot, ncol = 4, nrow = 4, base_height = 2)
 ```
 
-This should actually be a multi-panel plot with the correct line (quadratic or linear) based on the best-fit model.  Should annotate with p-values.
+#### plot using plot_grid()
+
+Making a list of plots and then using `plot_grid()`.  Pros: easier to annotate with p-values.  Cons: don't know how to do axis labels better, don't know how to remove lines from certain plots.
 
 ```{r}
 #Augment results with predicted values for drawing curves/lines
@@ -210,17 +232,23 @@ results2 <-
     }))
 
 # map a plotting function to every compound
-pmap(list(.x = results2$data, .y = results2$pred, .name = results2$compound, .p = results2$p.value), 
+plotlist <-
+  pmap(list(.x = results2$data, .y = results2$pred, .name = results2$compound, .p = results2$p.value), 
      function(.x, .y, .name, .p) {
        ggplot(.x, aes(x = mean_percent_damage, y = conc_ug_mg)) +
          geom_point() +
          geom_line(aes(x = mean_percent_damage, y = .fitted), data = .y) +
-         labs(x = "Mean % damaged leaf area",
-              y = "Concentration (µg/mg)",
-              subtitle = .name,
-              caption = glue("p = {round(.p, 4)}")) +
-         theme_bw()
+         labs(
+           x = "Mean % damaged leaf area",
+           y = "Concentration (µg/mg)",
+           subtitle = .name,
+           caption = glue("p = {round(.p, 4)}")) +
+         theme_bw() #+
+         # theme(axis.title = element_blank())
      })
+
+plot_grid(plotlist = plotlist) %>%
+  save_plot(here('figs', 'lc2017_plot2.png'), ., ncol = 4, nrow = 4, base_height = 2)
 ```
 
 
