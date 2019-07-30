@@ -1,0 +1,247 @@
+---
+title: "2017 Total Polyphenols"
+output: 
+  html_notebook: 
+    toc: yes
+    toc_float: yes
+---
+
+Total polyphenols were measured by Amma Agyei using the Folin-Ciocalteau assay Spring of 2019.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(here)
+library(car)
+library(janitor)
+library(cowplot)
+library(broom)
+library(glue)
+library(gghighlight)
+library(knitr)
+```
+
+# Read in data
+
+Total polyphenols data, leafhopper density data, and leaf damage data
+
+```{r message=FALSE, warning=FALSE}
+tp2017 <- read_csv(here("data", "raw", "2017 total polyphenols.csv"))
+damage2017 <- read_rds(here('data', 'cleaned', '2017_treatment_data.rds'))
+
+tp2018 <- read_csv(here("data", "raw", "2018 total polyphenols.csv"))
+damage2018 <- read_rds(here('data', 'cleaned', '2018_treatment_data.rds'))
+```
+
+Join data sheets.
+
+```{r}
+tp2017 <- 
+  tp2017 %>% 
+  clean_names() %>% 
+  full_join(damage2017, by = "sample") %>%
+  select(-leaf_density) #identical to `density_end`
+tp2017
+```
+```{r}
+tp2018 <- 
+  tp2018 %>% 
+  clean_names() %>% 
+  full_join(damage2018, by = "sample") %>%
+  select(-leaf_density) #identical to `density_end`
+tp2018
+```
+
+
+- sample: cultivar and sample ID. Q = qing xin da mao
+- standard_deviation: from averaging triplicates
+- mean_ga_equivalent: galic acid equivalents in mg/mL (i think)
+- coefficient_of_variation: from averaging triplicates(?)
+- leaf_density: leafhopper density at end of experiment in insects/young leaf
+- mg_tea: mg of tea powder
+- mg_g_gae: galic acid equivalents in mg/g of tea powder
+
+
+These data are means of triplicate runs.
+# 2017
+## Regression with leafhopper density as predictor
+
+Data seem normal enough to use a regular linear model
+
+```{r}
+shapiro.test(tp2017$mg_g_gae)
+#normal enough
+```
+
+## Relationship between density and damage
+
+Let's check the relationship between leafhopper density and damage
+
+```{r echo=FALSE}
+ggplot(tp2017, aes(x = density_end, y = mean_percent_damage)) +
+  geom_point() +
+  gghighlight(mean_percent_damage > 7, use_direct_label = TRUE, label_key = sample) +
+  labs(x = "Final leafhopper density (insects / shoot)",
+       y = "Mean % damaged leaf area") +
+  theme_bw()
+```
+
+Q2 stands out as extreme.  Inspection of the images shows that it includes 3 leaves with heavy hopperburn.
+
+For example:
+
+```{r echo=FALSE}
+include_graphics(here::here("docs", "plant_2_leaf_6.png"))
+```
+
+Even without this sample, there is clearly not a perfectly linear relationship between leafhopper density and damage.  Using damage as a predictor might give different results and would also allow me to potentially combine data from multiple years (although I did use a different classifier for the two years...I *could* re-do image analysis using the same classifier, or possibly re-train one on samples from both years.)
+
+## Remove sample Q2
+
+```{r}
+tp2017 <- tp2017 %>% filter(sample != "Q2")
+```
+
+## Polyphenols vs. Density
+
+I'll test for a quadratic or linear relationship.  **NOTE**: I could possibly do this by using # leafhoppers as a predictor and # leaves as an offset.  Not sure if that would be any different though.
+
+```{r}
+dens.poly.17 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2017)
+dens.linear.17 <- lm(mg_g_gae ~ density_end, data = tp2017)
+dens.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
+AIC(dens.poly.17, dens.linear.17, dens.null.17)
+# summary(dens.poly.17)
+Anova(dens.poly.17)
+```
+
+Looks like best model is intercept only, although polynomial is maybe better than linear.  No significant relationship between leafhopper density and total phenolics, with a trend toward a polynomial relationship.
+
+```{r eval=FALSE, include=FALSE}
+ggplot(augment(dens.poly.17), aes(.resid)) + geom_histogram(bins = 15)
+ggplot(augment(dens.poly.17), aes(sample = .resid)) + geom_qq() + geom_qq_line()
+```
+
+
+## Polyphenols vs. Damage
+
+```{r}
+dam.poly.17 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2017)
+dam.linear.17 <- lm(mg_g_gae ~ mean_percent_damage, data = tp2017)
+dam.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
+AIC(dam.poly.17, dam.linear.17, dam.null.17)
+Anova(dam.poly.17)
+```
+Now, the polynomial model is the best and there is a marginally significant relationship with  % damage (p = `r round(Anova(dam.poly)[["Pr(>F)"]][1],3)`)
+
+
+```{r echo=FALSE}
+dam.2017.plot <-
+  ggplot(tp2017, aes(x = mean_percent_damage, y = mg_g_gae)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = "y ~ poly(x, 2)", se = FALSE) +
+  labs(x = "Mean % damaged leaf area",
+       y = "Total polyphenols (mg/g GAE)",
+       title = "2017",
+       caption = "Sample Q2 removed") +
+  theme_bw() +
+  annotate(geom = "text", x = 1.1, y = 3, label = glue("p = {round(Anova(dam.poly.17)$`Pr(>F)`[1], 3)}"))
+dam.2017.plot
+```
+
+
+# 2018
+
+## Regression with leafhopper density as predictor
+
+Data seem normal enough to use a regular linear model
+
+```{r}
+shapiro.test(tp2018$mg_g_gae)
+#normal enough
+```
+
+## Relationship between density and damage
+
+Let's check the relationship between leafhopper density and damage
+
+```{r echo=FALSE}
+ggplot(tp2018, aes(x = density_end, y = mean_percent_damage, color = cultivar)) +
+  geom_point() +
+  gghighlight(mean_percent_damage > 7, use_direct_label = TRUE, label_key = sample) +
+  labs(x = "Final leafhopper density (insects / shoot)",
+       y = "Mean % damaged leaf area") +
+  theme_bw()
+```
+
+J23 has really high damage. It has 3 completely dead leaves, which maybe should be excluded.
+
+For example:
+```{r}
+include_graphics(here("docs", "leaf 31.png"))
+```
+
+## Remove sample J23
+
+```{r}
+tp2018 <- tp2018 %>% filter(sample != "J23")
+```
+
+## Polyphenols vs. density
+
+I'll test for a quadratic or linear relationship
+
+```{r}
+dens.poly.cv.18 <- lm(mg_g_gae ~ poly(density_end, 2)*cultivar, data = tp2018)
+dens.poly.18 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2018)
+dens.linear.cv.18 <- lm(mg_g_gae ~ density_end*cultivar, data = tp2018)
+dens.linear.18 <- lm(mg_g_gae ~ density_end, data = tp2018)
+dens.cv.18 <- lm(mg_g_gae ~ cultivar, data = tp2018)
+dens.null.18 <- lm(mg_g_gae ~ 1, data = tp2018)
+AIC(dens.poly.cv.18, dens.poly.18, dens.linear.cv.18, dens.linear.18, dens.cv.18, dens.null.18)
+# lmtest::lrtest(dens.linear.cv.18)
+# Anova(dens.cv.18)
+```
+
+The null model wins. No effect of cultivar or leafhopper density on total polyphenols.
+
+
+## Polyphenols vs. damage
+
+```{r}
+dam.poly.cv <- lm(mg_g_gae ~ poly(mean_percent_damage, 2) * cultivar, data = tp2018)
+dam.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2018)
+dam.linear.cv <- lm(mg_g_gae ~ mean_percent_damage * cultivar, data = tp2018)
+dam.linear <- lm(mg_g_gae ~ mean_percent_damage, data = tp2018)
+dam.cv <- lm(mg_g_gae ~ cultivar, data = tp2018)
+dam.null <- lm(mg_g_gae ~ 1, data = tp2018)
+AIC(dam.poly.cv, dam.poly, dam.linear.cv, dam.linear, dam.cv, dam.null)
+
+# Anova(dam.linear)
+```
+
+The null model wins.  There is no effect of cultivar or leaf damage on total polyphenols for 2018.
+
+
+```{r}
+dam.2018.plot <-
+  ggplot(tp2018, aes(x = mean_percent_damage, y = mg_g_gae, color = cultivar)) +
+  geom_point() +
+  # gghighlight(mean_percent_damage > 7, label_key = sample, use_direct_label = TRUE) +
+  # geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  labs(x = "Mean % damaged leaf area",
+       y = "Total polyphenols (mg/g GAE)",
+       title = "2018",
+       caption = "sample J23 removed") +
+  theme_bw() #+
+  # annotate(geom = "text", x = 1.1, y = 4, label = glue("p = {round(Anova(dam.linear)$`Pr(>F)`[1], 3)}"))
+dam.2018.plot
+```
+
+# Plot
+```{r}
+plot_grid(dam.2017.plot,
+          dam.2018.plot + theme(legend.position = "none")) %>% 
+  plot_grid(get_legend(dam.2018.plot), rel_widths = c(1, 0.1)) %>% 
+  save_plot(here('figs', 'tp.png'), ., ncol = 2)
+```
+
