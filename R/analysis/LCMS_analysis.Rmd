@@ -19,7 +19,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r packages, include=FALSE}
 library(tidyverse)
 library(here)
-library(ropls)
+library(vegan)
+library(RVAideMemoire)
 library(chemhelper)
 library(naniar)
 library(visdat)
@@ -38,11 +39,18 @@ Analysis of LCMS data from 2017 and 2018 leafhopper density experiments.
 ```{r data, echo=TRUE}
 lc2017 <- read_rds(here("data", "cleaned", "2017_lcms_wide.rds")) %>% 
   filter(sample != "Q2") #determined elsewhere that this has an unusually high ammount of damage for the treatment
-lc2018 <- read_rds(here("data", "cleaned", "2018_lcms_wide.rds"))
+lc2018 <- read_rds(here("data", "cleaned", "2018_lcms_wide.rds")) %>% 
+  filter(sample != "J23") #determined elswhere that this has an unusually high ammount of damage for the treatment
+
 
 lc2017_tidy <-
   read_rds(here('data', 'cleaned', '2017_lcms_tidy.rds')) %>% 
   filter(sample != "Q2")
+
+lc2018_tidy <- 
+  read_rds(here('data', 'cleaned', '2018_lcms_tidy.rds')) %>% 
+  filter(sample != "J23")
+
 ```
 
 ## Data Dictionary
@@ -93,64 +101,77 @@ corrr::correlate(lc2017_2[11:23]) %>%
 
 There are some strong correlations, so multivariable methods might be best?
 
-## 2017 PCA
+## RDA
+
+Probably RDA is better since there are some correlations?
+
+1. Fit RDA model
 
 ```{r}
-X <- lc2017_2[11:23]
-
-opls(X, printL = FALSE)
+lc2017_scaled <- lc2017_2 %>% mutate_at(vars(Caffeine:Theophylline), scale)
+rda.2017 <- rda(lc2017_scaled %>% select(Caffeine:Theophylline) ~ mean_percent_damage, data = lc2017_scaled)
 ```
 
-## 2017 PLSR
-
-No significant relationship between density or damage and metabolites. High R2Y, but very low Q2.  Overfitting?  Maybe if I remove some of the metabolites with a LOT of NAs?
+2. How much total variance does the experimental design explain?
 
 ```{r}
-try(opls(X, lc2017_2$density_end))
-opls(X, lc2017_2$mean_percent_damage, permI = 500, plotL = FALSE, printL = FALSE)
+MVA.synt(rda.2017)
 ```
 
+Only 11.62%
 
+3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(rda.2017)
+```
+
+Marginally significant effect of leaf damage on metabolites
+
+4. Then we test for significance of individual factors and interaction terms:
+
+```{r}
+MVA.anova(rda.2017)
+```
+
+Marginally significant effect of leaf damage on metabolites.
+
+5. Loadings
+
+```{r}
+MVA.get.loads(rda.2017)
+rda.2017$CCA$v %>% 
+  as_tibble(rownames = "compound") %>% 
+  arrange(RDA1)
+```
+
+Top contributors: EGCG, Caffeine, Theobromine.  All negative relationship with mean % damage.
 
 ## Regression analysis
 
-Ok, new approach.  Let's just do linear regressions?  Best way would be to load in the **tidy** versions of the data, do the same filtering (remove Q2, etc.), and then use tidyverse magic do all the regressions.
-
-```{r}
-lc2017_2
-
-caf <- lm(Caffeine ~ mean_percent_damage, data = lc2017_2)
-null <- lm(Caffeine ~ 1, data = lc2017_2)
-summary(caf)
-car::Anova(caf)
-
-c <- lm(Catechin ~ mean_percent_damage, data = lc2017_2)
-car::Anova(c)
+Best way would be to load in the **tidy** versions of the data, do the same filtering (remove Q2, etc.), and then use tidyverse magic do all the regressions.
 
 
-```
 ```{r}
 results <-
   lc2017_tidy %>% 
   select(sample, compound, conc_ug_mg, mean_percent_damage, density_end) %>% 
   group_by(compound) %>% 
   nest() %>% #creates list column of data for each compound
-  mutate(lm = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, .))) %>%  # apply a linear model
+  mutate(lm = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, .))) %>%  # apply a linear model to each compound
   mutate(poly = map(data, ~lm(conc_ug_mg ~ poly(mean_percent_damage, 2), .))) %>%  # apply a polynomial model
   mutate(null = map(data, ~lm(conc_ug_mg ~ 1, .))) %>% # apply a null model
   select(compound, data, lm, poly, null) %>% 
-  gather(-compound, -data, key = model.type, value = model) %>% 
-  mutate(stats = map(model, glance)) %>%
+  gather(-compound, -data, key = model.type, value = model) %>% #gather up all the models into one column
+  mutate(stats = map(model, glance)) %>% #extract model stats
   unnest(stats) %>%
   group_by(compound) %>% 
-  arrange(compound, AIC) %>% 
+  arrange(compound, AIC) %>% #figure out best model
   mutate(dAIC =  nth(AIC, 3)- AIC,
          dDF = nth(df, 3) - df) %>% #calculate dAIC
-  # filter(p.value < 0.2) %>%
   select(compound, model.type, dAIC, dDF, p.value, everything())
 
 results
-
 ```
 
 Looks like EGCG has a pretty strong significant negative relationship with damage.  Makes sense as EGCG would be converted into theaflavins and other polymerized compounds.
@@ -199,8 +220,11 @@ Using `facet_wrap()` and two `geom_smooth()`s.  Pros: easier to read code.  Cons
 
 ```{r}
 df <- full_join(lc2017_tidy, select(results2, compound, model.type, p.value))
-
-
+df <- df %>% 
+  mutate(compound = case_when(compound == "Caffeine" ~ "Caffeine(*)",
+                              compound == "Epigallocatechin gallate" ~ "Epigallocatechin gallate(***)",
+                              compound == "Theobromine" ~ "Theobromine(*)",
+                              TRUE ~ as.character(compound)))
 lc2017_plot <-
   ggplot(df, aes(x = mean_percent_damage, y = conc_ug_mg)) +
   geom_point() +
@@ -209,10 +233,11 @@ lc2017_plot <-
   facet_wrap(~compound, scales = "free_y") +
   labs(x = "Mean % damaged leaf area",
        y = "Concentration (µg/mg)",
-       subtitle = "2017") +
+       subtitle = "2017",
+       caption = " (*): p = 0.05\n(***): p < 0.001") +
   theme_bw() +
   theme(legend.position = "none")
-
+lc2017_plot
 save_plot(here('figs', 'lc2017_plot.png'), lc2017_plot, ncol = 4, nrow = 4, base_height = 2)
 ```
 
@@ -247,8 +272,8 @@ plotlist <-
          # theme(axis.title = element_blank())
      })
 
-plot_grid(plotlist = plotlist) %>%
-  save_plot(here('figs', 'lc2017_plot2.png'), ., ncol = 4, nrow = 4, base_height = 2)
+# plot_grid(plotlist = plotlist) %>%
+  # save_plot(here('figs', 'lc2017_plot2.png'), ., ncol = 4, nrow = 4, base_height = 2)
 ```
 
 
