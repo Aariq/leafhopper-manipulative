@@ -18,6 +18,7 @@ library(broom)
 library(glue)
 library(gghighlight)
 library(knitr)
+library(ggrepel)
 ```
 
 # Read in data
@@ -77,12 +78,16 @@ shapiro.test(tp2017$mg_g_gae)
 Let's check the relationship between leafhopper density and damage
 
 ```{r echo=FALSE}
-ggplot(tp2017, aes(x = density_end, y = mean_percent_damage)) +
+dens_dam_2017 <-
+  ggplot(tp2017, aes(x = density_end, y = mean_percent_damage, label = sample)) +
   geom_point() +
-  gghighlight(mean_percent_damage > 7, use_direct_label = TRUE, label_key = sample) +
-  labs(x = "Final leafhopper density (insects / shoot)",
-       y = "Mean % damaged leaf area") +
+  geom_text_repel(data = tp2017 %>% filter(mean_percent_damage > 10)) +
+  labs(x = "Final leafhopper density (insects / young leaf)",
+       y = "Mean % damaged leaf area",
+       subtitle = "2017") +
   theme_bw()
+
+dens_dam_2017 
 ```
 
 Q2 stands out as extreme.  Inspection of the images shows that it includes 3 leaves with heavy hopperburn.
@@ -165,12 +170,16 @@ shapiro.test(tp2018$mg_g_gae)
 Let's check the relationship between leafhopper density and damage
 
 ```{r echo=FALSE}
-ggplot(tp2018, aes(x = density_end, y = mean_percent_damage, color = cultivar)) +
+dens_dam_2018 <-
+  ggplot(tp2018, aes(x = density_end, y = mean_percent_damage, color = cultivar, label = sample)) +
   geom_point() +
-  gghighlight(mean_percent_damage > 7, use_direct_label = TRUE, label_key = sample) +
+  geom_text_repel(data = tp2018 %>% filter(mean_percent_damage > 7)) +
   labs(x = "Final leafhopper density (insects / shoot)",
-       y = "Mean % damaged leaf area") +
+       y = "Mean % damaged leaf area",
+       subtitle = "2018") +
   theme_bw()
+
+dens_dam_2018
 ```
 
 J23 has really high damage. It has 3 completely dead leaves, which maybe should be excluded.
@@ -243,5 +252,13 @@ plot_grid(dam.2017.plot,
           dam.2018.plot + theme(legend.position = "none")) %>% 
   plot_grid(get_legend(dam.2018.plot), rel_widths = c(1, 0.1)) %>% 
   save_plot(here('figs', 'tp.png'), ., ncol = 2)
+```
+
+
+```{r}
+plot_grid(dens_dam_2017 + coord_cartesian(ylim = c(0, 15)),
+          dens_dam_2018 + coord_cartesian(ylim = c(0,15)) + theme(legend.position = "none")) %>% 
+  plot_grid(get_legend(dens_dam_2018), rel_widths = c(1, 0.1)) %>% 
+  save_plot(here('figs', 'dam_dens.png'), ., ncol = 2)
 ```
 
