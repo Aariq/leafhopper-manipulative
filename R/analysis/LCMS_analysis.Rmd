@@ -12,6 +12,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(scipen =999) #turn of scientific notation
 ```
 
 *Last compiled: `r Sys.Date()`*
@@ -75,19 +76,33 @@ NAs are non-detects.  I should replace them with 0 or a very small number.
 
 ```{r}
 vis_dat(lc2017)
+vis_dat(lc2018)
 ```
 
 
 ```{r}
-lc2017_2 <-
-  lc2017 %>% 
-  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`) #all zeroes
+min(lc2017_tidy$conc_ug_mg, na.rm = TRUE)
 
 lc2017_tidy <- 
   lc2017_tidy %>% 
   filter(compound != "Catechin gallate") %>% #not detected in any sample
   mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg))
+
+lc2017_2 <-
+  lc2017 %>% 
+  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
+  select(-`Catechin gallate`) #all zeroes
+
+min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
+lc2018_tidy <-
+  lc2018_tidy %>% 
+  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #all zeros for all samples
+  mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg)) 
+
+lc2018_2 <- 
+  lc2018 %>% 
+  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
+  select(-`Catechin gallate`, -Theophylline) #all zeroes
 ```
 
 ## Examine correlations
@@ -96,11 +111,19 @@ lc2017_tidy <-
 corrr::correlate(lc2017_2[11:23]) %>% 
   corrr::shave() %>% 
   corrr::rplot() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "2017")
+
+corrr::correlate(lc2018_2[11:22]) %>% 
+  corrr::shave() %>% 
+  corrr::rplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "2018")
 ```
 
 There are some strong correlations, so multivariable methods might be best?
 
+# 2017
 ## RDA
 
 Probably RDA is better since there are some correlations?
@@ -276,4 +299,59 @@ plotlist <-
   # save_plot(here('figs', 'lc2017_plot2.png'), ., ncol = 4, nrow = 4, base_height = 2)
 ```
 
+# 2018
 
+## RDA
+Probably RDA is better since there are some correlations?
+
+1. Fit RDA model
+
+```{r}
+lc2018_scaled <- lc2018_2 %>% 
+  mutate_at(vars(Caffeine:Theobromine), scale) %>% 
+  mutate(cultivar = as.factor(cultivar))
+rda.2018 <- 
+  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar,
+      data = lc2018_scaled)
+```
+
+2. How much total variance does the experimental design explain?
+
+```{r}
+MVA.synt(rda.2018)
+```
+
+32.36% of variation explained by cultivar and leaf damage!
+
+3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(rda.2018)
+```
+
+Highly significant global effect
+
+4. Then we test for significance of individual factors and interaction terms:
+
+```{r}
+MVA.anova(rda.2018)
+```
+
+Significant effect of cultivar, no effect of damage.
+
+5. Loadings
+
+```{r}
+rda.2018$CCA$v %>% 
+  as_tibble(rownames = "compound") %>% 
+  arrange(RDA1)
+
+
+MVA.plot(rda.2018, 
+         fac = lc2018_scaled$cultivar,
+         drawextaxes = FALSE,
+         main = "LCMS compounds",
+         main.pos = "topleft")
+```
+
+Cultivar differences mainly in Theobromine, Gallocatechin, Epigallocatechin and Caffeine with all of them lower in Jin Guan Yin
