@@ -1,12 +1,28 @@
 ---
 title: "2018 GCMS pre-treatment"
-output: html_notebook
+author: Eric R. Scott
+date: "2019-07-31"
+output: 
+  html_notebook:
+    toc: yes
+    toc_float: yes
 ---
+```{r setup}
+knitr::opts_chunk$set(
+	echo = TRUE
+)
+```
+
+# Packages
+
 ```{r}
 library(tidyverse)
 library(chemhelper)
 library(here)
 ```
+
+# Read in Data
+## All the exported integration files
 
 ```{r}
 Data.dir <- "/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data"
@@ -27,6 +43,8 @@ gc_tidy <- files %>%
 gc_tidy
 ```
 
+## Alkane files
+Read and wrangle
 ```{r}
 alkanes1 <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix/Meth_073018_alkanemix Integration Report.csv")
 alkanes_lj <-
@@ -46,36 +64,127 @@ alkanes_jgy <-
   add_column(C_num = 6:24)
 ```
 
+## Extract cultivar and sample name from filename
+I think jinguanyin blank20 is actually not a blank
+
 ```{r}
-cresol311 <- as.cas("106445")
-cresol416 <- as.cas("93516")
-cedr <- as.cas(469614)
-terp <- as.cas(562743)
-
-cresol311.ri <- nist_ri(cresol311, "linear", "non-polar", "ramp") %>% 
-  filter(gas == "Helium", str_detect(phase, "5"), thickness < 0.3) %>% 
-  summarize(mean_ri = mean(RI))
-
-cresol311.rt.lj <- calc_RT(1078.75, alkanes_lj$rt, alkanes_lj$C_num)
-cresol311.rt.jgy <- calc_RT(1078.75, alkanes_jgy$rt, alkanes_jgy$C_num)
-
-
-
-cresol416.ri <- nist_ri(cresol416, "linear", "non-polar", "custom") %>% 
-  filter(gas == "Helium") %>% 
-  summarize(mean_ri = mean(RI))
-
-cresol416.rt.lj <- calc_RT(1193.025, alkanes_lj$rt, alkanes_lj$C_num)
-
-cedr.ri <- nist_ri(cedr, 'linear', 'non-polar', 'ramp') %>% 
-  filter(gas == "Helium", str_detect(phase, "5")) %>% 
-  summarize(mean_ri = mean(RI))
-
-calc_RT(cedr.ri$mean_ri[1], alkanes_jgy$rt, alkanes_jgy$C_num)
-
-terp.ri <- nist_ri(terp, 'linear', 'non-polar', 'ramp') %>% 
-  filter(gas == "Helium", str_detect(phase, "5")) %>% 
-  summarize(mean_ri = mean(RI))
-calc_RT(terp.ri$mean_ri[1], alkanes_lj$rt, alkanes_lj$C_num)
+gc_tidy <-
+  gc_tidy %>% 
+  mutate(filename = str_remove(filename, ".D$")) %>% # for some reason one file has a .D at the end.
+  mutate(filename = str_replace(filename, "Blank20", "Bag20")) %>% #pretty sure it's not a blank
+  mutate(cultivar = case_when(str_detect(filename, "Longjing") ~ "L",
+                              str_detect(filename, "Jin") ~ "J",
+                              TRUE ~ as.character(NA)), #shouldn't be any NAs, but just in case
+         plant_num = as.character(as.integer(str_extract(filename, "\\d+$"))), #blanks will be NA
+         sample = paste0(cultivar, plant_num)) %>% 
+  select(filename, cultivar, plant_num, sample, everything())
 ```
 
+
+# Tag non-detects and to-be-censored
+
+```{r}
+gc_tidy <-
+  gc_tidy %>%
+  mutate(ND = area == 0,
+         Censor = area > 0 & area < 1000)
+```
+
+
+# Remove known contaminants and problematic peaks
+Contaminants:
+
+- Propanoic acid, 2-methyl-, 1-(1, 1-dimethylethyl)-2methyl-1, 3-propanediyl ester (from nitrile gloves)
+- Toluene (very large peak, seems unlikely that it is a natural product)
+
+These chlorinated compounds are likely pesticides:
+
+- Benzaldehyde, 2,6-dichloro-
+- Benzene, chloro-
+
+```{r}
+contaminants <- c("Propanoic acid, 2-methyl-, 1-(1,1-dimethylethyl)-2-methyl-1,3-propanediyl ester",
+                  "Toluene",
+                  "Benzyl chloride",
+                  "Benzene, chloro-",
+                  "Benzaldehyde, 2,6-dichloro-",
+                  "141")
+
+# gc_tidy %>% filter(Compound %in% contaminants) %>% count(filename)
+gc_tidy.1 <-
+  gc_tidy %>%
+  filter(!Compound %in% contaminants) %>%
+  filter(No. > 91)
+```
+
+# Calculate RPA
+
+```{r}
+#extract napthalene D8 area
+gc_IS <-
+  gc_tidy.1 %>% 
+  filter(Compound == "Naphthalene-D8") %>%
+  rename(IS = area) %>% 
+  select(filename, IS)
+
+#join with gc.tidy and mutate to calculate RPA
+gc_tidy.2 <- full_join(gc_tidy.1, gc_IS)
+gc_tidy.2 <- gc_tidy.2 %>% 
+  mutate(RPA = area/IS) %>% 
+  #don't need Naphtalene-D8 anymore
+  filter(Compound != "Naphthalene-D8")
+# gc_tidy.2 %>% filter(str_detect(filename, "Jin")) %>% count(filename)
+```
+
+# Method blank subtraction
+
+I have two method blanks, one for each cultivar
+
+```{r}
+gc_tidy.3 <- 
+  gc_tidy.2 %>% 
+  #split by cultivar
+  group_by(cultivar) %>% 
+  group_split() %>% 
+  # for each cultivar extract the blanks and join them to the data minus the blanks
+  purrr::map(~{
+    blank <- filter(., str_detect(filename, "[b,B]lank")) %>% 
+      rename(background = RPA) %>% 
+      select(Compound, background)
+    gc <- filter(., !str_detect(filename, "[b,B]lank"))
+    left_join(gc, blank)
+  }) %>% 
+  # recombine cultivars
+  bind_rows()
+```
+
+Two ways of dealing with blanks:
+
+1. Literal subtraction
+2. Nicole's method: if RPA > background then keep it as is, if RPA <= background, set to zero.
+```{r}
+gc_tidy.4 <- gc_tidy.3 %>% 
+  mutate(RPA = RPA-background)
+gc_tidy.4
+```
+
+
+# Remove rare peaks
+Should this be done before or after blank subtraction?
+Remove compounds that are found in 3 or fewer samples.
+
+```{r}
+gc_tidy.5 <-
+  gc_tidy.4 %>% 
+  group_by(Compound) %>% #for each compound...
+  filter(sum(RPA > 0) >= 3) #calculate the number of rows where RPA > 0 then filter the dataframe to keep only those where that sum is greater than or equal to 3
+
+# gc_tidy.4 %>% count(filename) #536 compounds
+# gc_tidy.5 %>% ungroup() %>% count(filename) #359 compounds
+```
+
+# Calculate retention indices
+
+# Blank subtracion
+
+# 
