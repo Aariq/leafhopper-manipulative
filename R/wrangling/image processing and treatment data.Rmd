@@ -394,3 +394,28 @@ write_rds(treatment_data_2018, here('data', 'cleaned', '2018_treatment_data.rds'
 write_rds(treatment_data_2017, here('data', 'cleaned', '2017_treatment_data.rds'))
 ```
 
+# Relationship between start and end density
+
+```{r}
+# treatment_data_2018 <- read_rds(here('data', 'cleaned', '2018_treatment_data.rds'))
+ggplot(treatment_data_2018, aes(x = density_start, y = density_end, color = cultivar)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+m <- lm(density_end ~ density_start*cultivar, data = treatment_data_2018)
+car::Anova(m)
+summary(m)
+```
+```{r}
+# treatment_data_2017 <- read_rds(here('data', 'cleaned', '2017_treatment_data.rds'))
+ggplot(treatment_data_2017, aes(x = density_start, y = density_end)) +
+  geom_jitter(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE)
+
+m2 <- lm(density_end ~ density_start, data = treatment_data_2017)
+summary(m2)
+car::Anova(m2)
+```
+
+
+Relationship is maybe a little different between cultivars.
