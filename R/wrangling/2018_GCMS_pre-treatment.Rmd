@@ -6,13 +6,15 @@ output:
   html_notebook:
     toc: yes
     toc_float: yes
+    highlight: kate
+    theme: yeti
 ---
 ```{r setup}
 knitr::opts_chunk$set(
 	echo = TRUE
 )
 ```
-
+*Last compiled: `r Sys.Date()`*
 # Packages
 
 ```{r}
@@ -140,9 +142,6 @@ gc_tidy.2 <- gc_tidy.2 %>%
 # gc_tidy.2 %>% filter(str_detect(filename, "Jin")) %>% count(filename)
 ```
 
-# Calculate Retention Indices
-TODO
-
 # Method blank subtraction
 
 I have two method blanks, one for each cultivar
@@ -197,6 +196,18 @@ treatments <- read_rds(here('data', 'cleaned', '2018_treatment_data.rds'))
 gc_tidy.6 <- left_join(gc_tidy.5, treatments)
 ```
 
+# Calculate Retention Indices
+
+```{r}
+gc_tidy.7 <-
+  gc_tidy.6 %>% 
+  mutate(ri = case_when(cultivar == "J" ~ calc_RI(rt, alkanes_jgy$rt, alkanes_jgy$C_num),
+                        cultivar == "L" ~ calc_RI(rt, alkanes_lj$rt, alkanes_lj$C_num)))
+```
+
+# Add CAS numbers
+TODO
+
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
 Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  There may be other RPA values <= 0 due to subtracting the method blank.
@@ -206,7 +217,7 @@ I'll set all zeroes to 1/IS.  This will be useful for log-transforming data sinc
 
 ```{r}
 gc_tidy.final <-
-  gc_tidy.6 %>%
+  gc_tidy.7 %>%
   mutate(RPA = case_when(ND      ~ 1/IS,
                          Censor  ~ 1/IS,
                          RPA <=0 ~ 1/IS,
@@ -215,7 +226,7 @@ gc_tidy.final <-
                              Censor  ~ FALSE,
                              RPA <=0 ~ FALSE,
                              TRUE    ~ TRUE)) %>%
-  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, present)
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, ri, present)
 
 #How many compounds detected in each sample?
 gc_tidy.final %>%
@@ -232,7 +243,7 @@ Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.
 ```{r}
 gc_wide <- 
   gc_tidy.final %>%
-  select(-rt, -No., -present) %>%
+  select(-rt, -ri, -No., -present) %>%
   spread(key = Compound, value = RPA)
 ```
 
