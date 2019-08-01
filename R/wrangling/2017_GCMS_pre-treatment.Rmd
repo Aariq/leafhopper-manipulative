@@ -38,22 +38,43 @@ This will give you sample data with 0s and possibly negative values for RPA and 
 
 ```{r directories}
 #this is the directory that contains data files loaded into the project already
-Data.dir <- "/Users/scottericr/Box/IonAnalytics/IonAnalytics Projects/Fujian 2017 Manipulative/Data/"
+Data.dir <- "/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Fujian 2017 Manipulative/Data"
+
+if(!dir.exists(Data.dir)) {
+  stop("Gotta connect to the network drive!")
+}
+
 files <- dir(Data.dir,
              pattern = "Fujian Manipulative Adjusted2 Integration Report.csv",
              full.names = TRUE, #adds full path
              recursive = TRUE) #drills down in directory structure
 
 filenames <- str_extract(files, "(?<=/)[^/]+(?=/[^/]+$)")
-samples <- str_extract(filenames, "(?<=Hop_).+(?=\\.D)")
+# samples <- str_extract(filenames, "(?<=Hop_).+(?=\\.D)")
 gc_tidy <- files %>%
   map(read_IA) %>%
-  set_names(samples) %>% 
-  bind_rows(.id = "sample") %>% 
+  set_names(filenames) %>% 
+  bind_rows(.id = "filename") %>% 
   rename(area = `Area [a.u.*s]`,
          rt = `R.Time [min.]`)
-gc_tidy
+
 ```
+## Alkane Files
+TODO
+
+## Extract sample name from filename, set cultivar
+
+```{r}
+gc_tidy <- 
+  gc_tidy %>% 
+  mutate(cultivar = "Q",
+         plant_num = str_extract(filename, "(?<=Hop_)\\d+(?=_)"), #blanks will be NA
+         sample = ifelse(!is.na(plant_num), paste0(cultivar, plant_num), filename)) %>% 
+  select(filename, cultivar, plant_num, sample, everything())
+  
+```
+
+
 
 # Tag non-detects and to-be-censored
 
@@ -142,14 +163,24 @@ For now, I'm just using the end data, so I'll just use the end blank.
 
 ```{r}
 #split into samples and background
-gc_blank <- gc_tidy.2 %>% filter(str_detect(sample,"blank_end"))
-gc_tidy.3 <- gc_tidy.2 %>% filter(!str_detect(sample, "blank"))
+gc_blank <-
+  gc_tidy.2 %>%
+  filter(str_detect(filename,"blank_end"))
+gc_tidy.3 <-
+  gc_tidy.2 %>% 
+  filter(!str_detect(filename, "blank"))
+
 #subtract background
-gc_blank.1 <- gc_blank %>%
-   rename(background = RPA) %>% 
-   select(Compound, background)
+gc_blank.1 <-
+  gc_blank %>%
+  rename(background = RPA) %>% 
+  select(Compound, background)
+
 gc_tidy.3 <- left_join(gc_tidy.3, gc_blank.1)
-gc_tidy.4 <- gc_tidy.3 %>% mutate(RPA = RPA - background)
+
+gc_tidy.4 <-
+  gc_tidy.3 %>%
+  mutate(RPA = RPA - background)
 ```
 
 # Remove rare peaks
@@ -157,45 +188,22 @@ gc_tidy.4 <- gc_tidy.3 %>% mutate(RPA = RPA - background)
 Remove compounds that are found in 3 or fewer samples.
 
 ```{r}
-gc_keepers <- gc_tidy.4 %>%
-  group_by(Compound) %>%
-  summarise(test = sum(RPA > 0)) %>%
-  filter(test >=3) %>%
-  select(-test)
-
-gc_tidy.5 <- left_join(gc_keepers, gc_tidy.4) %>%
-  select(sample, No., Type, Compound, everything()) %>%
-  arrange(sample)
+gc_tidy.5 <-
+  gc_tidy.4 %>% 
+  group_by(Compound) %>% #for each compound...
+  filter(sum(RPA > 0) >= 3)
 ```
 
 
 # Read in treatment data and join
 
 ```{r}
-treatment_raw <-
-  read_csv(here("data", "2017", "raw", "2017 manipulative experiment treatment data.csv")) %>%
-  filter(!is.na(Plant)) %>% #remove empty lines
-  filter(Plant != "blank") #remove blanks
-treatment_raw 
+treatments <- read_rds(here('data', 'cleaned', '2017_treatment_data.rds'))
 ```
 
-In this experiment, I first counted the number of young leaves (`Leaves`), then randomly assigned a density treatment (`Density`, leafhoppers per leaf).  I then put on about the right ammount of leafhoppers (`Leafhoppers.start`).  After the experiment ran, I counted the leafhoppers again at the end (`Leafhoppers.end`).  I measured chemistry with DCSE before putting any leafhoppers on (samples that end with `_start`) and again when I counted the final number of leafhoppers (samples that end with `_end`).
-
-I'll calculate an exact starting and ending density (and mean density?) to use for statistics.
 
 ```{r}
-trt_data <- 
-  treatment_raw %>%
-  mutate(sample = paste0(Plant, "_end")) %>% 
-  select(-Plant, -Twister.start, -Twister.end, -Notes, -Density) %>% 
-  select(sample, everything()) %>% 
-  mutate(density_start = ifelse(Leafhoppers.start == 0, 0, Leafhoppers.start / Leaves), 
-         #necessary because of NAs for Leaves
-         density_end = ifelse(Leafhoppers.end == 0, 0, Leafhoppers.end / Leaves))
-```
-
-```{r}
-gc_tidy.6 <- left_join(gc_tidy.5, trt_data)
+gc_tidy.6 <- left_join(gc_tidy.5, treatments)
 ```
 
 
@@ -209,39 +217,34 @@ I want to deal with these values in two ways:
 
 2. Set them all to 1/IS.  This will be useful for log-transforming data since log(0) = -inf.
 
+On second thought, I think all I need is a tidy dataset with zeroes set to 1/IS and a column for present or not
+
 ```{r}
-gc_tidy.ones <-
+gc_tidy.final <-
   gc_tidy.6 %>%
   mutate(RPA = case_when(ND      ~ 1/IS,
                          Censor  ~ 1/IS,
                          RPA <=0 ~ 1/IS,
                          TRUE    ~ RPA),
-         Present = case_when(ND      ~ FALSE,
+         present = case_when(ND      ~ FALSE,
                              Censor  ~ FALSE,
                              RPA <=0 ~ FALSE,
                              TRUE    ~ TRUE)) %>%
-  select(sample, density_start, density_end, Compound, RPA, rt, Present)
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, present)
 
-gc_tidy.zeroes <-
-  gc_tidy.6 %>%
-  mutate(RPA = case_when(ND      ~ 0,
-                         Censor  ~ 0,
-                         RPA <=0 ~ 0,
-                         TRUE    ~ RPA)) %>%
-  select(sample, density_start, density_end, Compound, RPA, rt)
+#How many compounds detected in each sample?
+gc_tidy.final %>%
+  group_by(sample) %>%
+  summarize(num_compounds = sum(present))
 ```
 
-# Create wide data frames
+# Create wide data frame
 
 ```{r}
-gc_wide.zeroes <-
-  gc_tidy.zeroes %>%
-  select(-rt) %>%
-  spread(key = Compound, value = RPA)
-
-gc_wide.ones <- 
-  gc_tidy.ones %>%
-  select(-rt, -Present) %>%
+gc_wide <- 
+  gc_tidy.final %>%
+  ungroup() %>% 
+  select(-rt, -No., -present) %>%
   spread(key = Compound, value = RPA)
 ```
 
@@ -259,10 +262,11 @@ I'll use a combination of univariate scatterplots and PCA to check for outliers
 
 ```{r}
 plot_data <-
-  gc_tidy.zeroes %>%
-  mutate(shortname = str_trunc(Compound, 12) %>%
-           fct_reorder(RPA, mean), #reorder compounds
-         group = as.numeric(shortname) %>%
+  gc_tidy.final %>%
+  ungroup() %>% 
+  mutate(shortname = as.factor(str_trunc(Compound, 12))) %>%
+  mutate(shortname = fct_reorder(Compound, RPA, mean)) %>% 
+  mutate(group = as.numeric(shortname) %>%
            cut(6) %>%
            as.integer()) %>% 
   split(.$group)
@@ -284,21 +288,22 @@ plots.labeled <- map(plots, gglabeller)
 plots.labeled
 ```
 
-Sample 8_end shows up consistently as an extreme value.
+Sample Q8 shows up a lot as an extreme value.
 
 ## Preliminary PCA
 
 ```{r}
+metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 library(ropls)
-pca.1 <- opls(select(gc_wide.ones, -density_start, -density_end, -sample), scaleC = "standard")
+pca.1 <- opls(select(gc_wide, -metavars), scaleC = "standard")
 pca.2 <-
-  gc_wide.ones %>%
-  mutate_at(vars(-density_start, -density_end, -sample), log) %>%
-  select(-sample, -density_start, -density_end) %>%
+  gc_wide %>%
+  select(-metavars) %>%
+  mutate_all(log) %>%
   opls(scaleC = "standard")
 
-plot(pca.2, parLabVc = gc_wide.ones$sample)
-plot(pca.1, parLabVc = gc_wide.ones$sample)
+plot(pca.2, parLabVc = gc_wide$sample)
+plot(pca.1, parLabVc = gc_wide$sample) #log transformed
 ```
 
 log transformation makes PCA worse? Either way, 8_end is definitely a major outlier
@@ -306,20 +311,22 @@ log transformation makes PCA worse? Either way, 8_end is definitely a major outl
 # Remove Outliers
 
 ```{r}
-outliers <- c("8_end")
-pca.3 <- gc_wide.ones %>%
+outliers <- c("Q8")
+pca.3 <-
+  gc_wide %>%
   filter(!sample %in% outliers) %>%
-  select(-density_start, -density_end, -sample) %>%
-  opls(scaleC = "standard")
+  select(-metavars) %>%
+  opls(scaleC = "standard", plotL = FALSE, printL = FALSE)
 
-pca.4 <- gc_wide.ones %>%
+pca.4 <-
+  gc_wide %>%
   filter(!sample %in% outliers) %>%
-  mutate_at(vars(-sample, -density_start, -density_end), log) %>%
-  select(-density_start, -density_end, -sample) %>%
-  opls(scaleC = "standard")
+  select(-metavars) %>% 
+  mutate_all(log) %>%
+  opls(scaleC = "standard", plotL = FALSE, printL = FALSE)
 
-plot(pca.3, parLabVc = gc_wide.ones %>% filter(!sample %in% outliers) %>% .$sample)
-plot(pca.4, parLabVc = gc_wide.ones %>% filter(!sample %in% outliers) %>% .$sample)
+plot(pca.3, parLabVc = gc_wide %>% filter(!sample %in% outliers) %>% .$sample)
+plot(pca.4, parLabVc = gc_wide %>% filter(!sample %in% outliers) %>% .$sample)
 ```
 
 No, log improves I think.
@@ -327,16 +334,14 @@ No, log improves I think.
 Remove outlier:
 
 ```{r}
-gc_wide.ones <- gc_wide.ones %>% filter(!sample %in% outliers) 
-gc_wide.zeroes <- gc_wide.zeroes %>% filter(!sample %in% outliers) 
-gc_tidy.ones <- gc_tidy.ones %>% filter(!sample %in% outliers) 
-gc_tidy.zeroes <- gc_tidy.zeroes %>% filter(!sample %in% outliers) 
+gc_wide <- gc_wide %>% filter(!sample %in% outliers) 
+gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers) 
 ```
 
 
 # Write to file
 
 ```{r}
-write_rds(gc_wide.ones, here("data", "2017", "cleaned", "2017_GCMS_wide.rds"))
-write_rds(gc_tidy.zeroes, here("data", "2017", "cleaned", "2017_GCMS_tidy.rds"))
+write_rds(gc_wide, here("data", "cleaned", "2017_gcms_wide.rds"))
+write_rds(gc_tidy.final, here("data", "cleaned", "2017_gcms_tidy.rds"))
 ```
