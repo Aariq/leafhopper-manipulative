@@ -248,6 +248,9 @@ gc_wide <-
 ```
 
 # Outlier detection
+
+This may change once the data is finalized.
+
 ```{r}
 library(HDoutliers)
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
@@ -263,11 +266,14 @@ pca <- opls(select(gc_wide, -metavars)%>% mutate_all(log) , plotL = FALSE, predI
 plot(pca, parLabVc = gc_wide$sample)
 ```
 
-Here, J4 and J11 are really weird outliers.
+Here, J4 and J11 are really weird outliers.  Turns out the internal standard peaks are very small for some reason.  I'm guessing just a mistake applying it to the Twister.
+
+# Remove outliers
 
 ```{r}
-library(mvoutlier)
-
+outliers <- c("J4", "J11")
+gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers)
+gc_wide <- gc_wide %>% filter(!sample %in% outliers)
 ```
 
 
