@@ -247,6 +247,29 @@ gc_wide <-
   spread(key = Compound, value = RPA)
 ```
 
+# Outlier detection
+```{r}
+library(HDoutliers)
+metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+out <- HDoutliers(select(gc_wide, -metavars) , alpha = 0.1)
+out
+gc_wide[out,]$sample
+```
+J4 and J11 are outliers
+
+```{r}
+library(ropls)
+pca <- opls(select(gc_wide, -metavars)%>% mutate_all(log) , plotL = FALSE, predI = 2)
+plot(pca, parLabVc = gc_wide$sample)
+```
+
+Here, J4 and J11 are really weird outliers.
+
+```{r}
+library(mvoutlier)
+
+```
+
 
 # Write to file
 
