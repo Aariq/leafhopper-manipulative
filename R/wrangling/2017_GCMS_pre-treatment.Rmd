@@ -233,6 +233,8 @@ gc_tidy.7 <-
   mutate(ri = calc_RI(rt, alkanes$rt, alkanes$C_num))
 ```
 
+# Add CAS numbers
+TODO
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
@@ -278,49 +280,26 @@ gc_wide <-
 
 # Preliminary Data Analysis
 
-I'll use a combination of univariate scatterplots and PCA to check for outliers
+## Multivariate outlier detection
 
-## Univariate plots
-
-### Prepare data
-1. Order compounds by mean RPA so that when I break them into chunks, the scales will be more helpful
-2. Slice data into chunks
-3. Graph 'em with gglabeller and select potential outliers
+Using Leland Wilkinson's algorithm from `HDoutliers`
 
 ```{r}
-plot_data <-
-  gc_tidy.final %>%
-  ungroup() %>% 
-  mutate(shortname = as.factor(str_trunc(Compound, 12))) %>%
-  mutate(shortname = fct_reorder(Compound, RPA, mean)) %>% 
-  mutate(group = as.numeric(shortname) %>%
-           cut(6) %>%
-           as.integer()) %>% 
-  split(.$group)
-#must explicitly drop unused factors or gglabeller won't work
-plot_data <- map(plot_data, ~ select(., -group) %>% mutate(shortname = fct_drop(shortname))) 
-```
-
-### Label plots
-
-```{r eval=FALSE}
-plots <- map(plot_data,
-    ~ggplot(., aes(y = RPA, x = shortname, color = density_end, label = sample)) +
-     geom_point() +
-      coord_flip() +
-      scale_x_discrete(drop = FALSE) +
-      theme_bw()
-)
-plots.labeled <- map(plots, gglabeller)
-plots.labeled
-```
-
-Sample Q8 shows up a lot as an extreme value.
-
-## Preliminary PCA
-
-```{r}
+library(HDoutliers)
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+out1 <- HDoutliers(select(gc_wide, -metavars), alpha = 0.1)
+gc_wide[out1, ]$sample
+#after log transformation
+out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
+gc_wide[out2, ]
+```
+
+Q8 shows up as an outlier in the log transformed data, but not in the untransformed data. It's not a particularly extreme level of damage or leafhopper density either.
+
+
+## With PCA
+
+```{r}
 library(ropls)
 pca.1 <- opls(select(gc_wide, -metavars), scaleC = "standard", plotL = FALSE)
 pca.2 <-
@@ -333,7 +312,7 @@ plot(pca.2, parLabVc = gc_wide$sample)
 plot(pca.1, parLabVc = gc_wide$sample) #log transformed
 ```
 
-log transformation makes PCA worse? Either way, 8_end is definitely a major outlier
+Q8 shows up as an outlier in both raw and log-transformed data.
 
 # Remove Outliers
 
