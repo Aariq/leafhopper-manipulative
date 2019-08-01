@@ -223,7 +223,9 @@ gc_tidy.final %>%
   summarize(num_compounds = sum(present))
 ```
 
+
 # Create wide dataframe for multivariate analysis
+
 
 Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.0 with the `pivot_wider()` function, but I don't think its so important that I need to use a development version of a package.
 
@@ -232,8 +234,6 @@ gc_wide <-
   gc_tidy.final %>%
   select(-rt, -No., -present) %>%
   spread(key = Compound, value = RPA)
-gc_tidy.final %>% count(sample)
-
 ```
 
 
@@ -245,4 +245,7 @@ I think all I'm going to need is the tidy version with the `present` column and 
 write_rds(gc_tidy.final, here('data', 'cleaned', '2018_gcms_tidy.rds'))
 write_rds(gc_wide, here('data', 'cleaned', '2018_gcms_wide.rds'))
 ```
+
+
+
 
