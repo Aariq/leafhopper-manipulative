@@ -1,58 +1,77 @@
 ---
-title: "Leafhopper 2017 manipulative experiment analysis"
-output: html_document
+title: "2017 Leafhopper GCMS analysis"
+author: "Eric R. Scott"
+date: "2019-08-01"
+output: 
+  html_notebook: 
+    highlight: kate
+    theme: yeti
+    toc: yes
+    toc_float: yes
 ---
-# To Do:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-- ~~Arcsin sqrt transform % damage data (a common transformation for percentage data to make normal)~~ (doesn't help)
-- Wait, do I have to do a log-transformation?  What happens if I don't?
-- Remove compounds only found in 3 or fewer samples.
-- This is **not** compositional data (because I care about sums and ratios), so don't do clr transformation
+*Last compiled: `r Sys.Date()`*
 
-# NOTE: 
-
-The image analysis for these data was done using a classifier trained on a different cultivar.  Just by visually inspecting the images, it didn't do a super great job.  Also, there was a lot of "hopperburn" that threw off the damage measurments.  If I get a chance, I should train a new classifier on a random sample of these leaves and re-run PLS regression with the new damage data.
-
-
-```{r}
+```{r packages, include=FALSE}
 library(tidyverse)
 library(here)
-library(ropls)
-library(chemhelper)
-library(cowplot)
-library(latex2exp)
-library(webchem)
+#for RDA:
+library(vegan)
+library(RVAideMemoire)
+
+# library(ropls)
+# library(chemhelper)
+# library(cowplot)
+# library(latex2exp)
+# library(webchem)
 ```
 
-# Read in Data
+# Purpose
 
+What is the goal of this notebook?
+
+# Load Data
 Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
+```{r data, echo=TRUE}
+gc_wide <- read_rds(here("data", "cleaned", "2017_gcms_wide.rds"))
+gc_tidy <- read_rds(here("data", "cleaned", "2017_gcms_tidy.rds"))
+gc_wide
+```
+
+## Data Dictionary
+
+`gc_tidy`: A tidy dataframe of all the chemistry and other data
+
+- `sample`: Sample name
+- `cultivar`: In this year, all plants were Qing Xin Da Mao, but I included this column for uniformity with the 2018 experiment.
+- `density_start`: The density of leafhoppers applied at the start of the experiment in **insects/young leaf**
+- `density_end`: Ending density in **insects/young leaf** 
+- `mean_percent_damage`: Percentage of damaged pixels averaged across all leaves for that sample
+- `twister_damage`: Percentage of damaged pixels for the leaf the volatiles were sampled from.  This is missing from many samples because I forgot to mark the leaves as I was taking off the Twisters
+- `No.`: Compound number.  This comes from the Ion Analytics methods file.
+- `Compound`: Compound name
+- `RPA`: Relative peak area
+- `rt`: retention time, in minutes
+- `ri`: retention index
+- `present`: logical. Was the compound detected in a particular sample?
+
+`gc_wide`: A wide version with columns for each `Compound` with `RPA` as the value
+
+
+# Data pre-treatment
+I'm going to log-transform the 
+
+# Analysis
+
+
 
 ```{r}
 
-gc_wide.ones <- read_rds(here("data", "2017", "cleaned", "2017_GCMS_wide.rds"))
-gc_tidy.zeroes <- read_rds(here("data", "2017", "cleaned", "2017_GCMS_tidy.rds"))
-
-leafdamage <- read_rds(here("data", "2017", "cleaned", "leaf damage.rds"))
 ```
 
-# Summarise leaf damage data
-
-I want to create two columns to merge with the GCMS data.  First, a mean percent damage for each plant, second, the percent damage from the leaf the twister was on.
-
-```{r}
-damage_summary <- leafdamage %>% 
-  group_by(plant.num) %>% 
-  summarise(damage_mean.percent = mean(damage.percent))
-
-twisterleaf <- leafdamage %>% 
-  filter(leaf.num == "T") %>% 
-  select(plant.num, "damage_T" = damage.percent)
-
-damage <- full_join(damage_summary, twisterleaf)
-```
-
-# PLS-R
 
 
 ## Log transform data

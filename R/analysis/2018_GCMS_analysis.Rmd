@@ -1,0 +1,44 @@
+---
+title: "2018 Leafhopper GCMS analysis"
+author: "Eric R. Scott"
+date: "2019-08-01"
+output: 
+  html_notebook: 
+    highlight: kate
+    theme: yeti
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Last compiled: `r Sys.Date()`*
+
+```{r packages, include=FALSE}
+library(tidyverse)
+library(here)
+#for RDA:
+library(vegan)
+library(RVAideMemoire)
+```
+
+# Purpose
+
+What is the goal of this notebook?
+
+# Load Data
+
+```{r data, echo=TRUE}
+df <- read_csv(here("data", ""))
+```
+
+## Data Dictionary
+
+`Dataframe1`: My data
+
+- `col1`: A variable
+- `col2`: Another variable
+
+# Analysis
