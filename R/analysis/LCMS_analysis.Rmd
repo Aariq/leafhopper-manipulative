@@ -12,13 +12,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-options(scipen =999) #turn of scientific notation
+options(scipen =999) #turn off scientific notation
 ```
 
 *Last compiled: `r Sys.Date()`*
 
 ```{r packages, include=FALSE}
 library(tidyverse)
+library(lubridate)
 library(here)
 library(vegan)
 library(RVAideMemoire)
@@ -29,6 +30,7 @@ library(broom)
 library(modelr)
 library(glue)
 library(cowplot)
+
 ```
 
 # Purpose
