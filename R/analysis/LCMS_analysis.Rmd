@@ -128,12 +128,14 @@ There are some strong correlations, so multivariable methods might be best?
 
 Probably RDA is better since there are some correlations?
 
+
 1. Fit RDA model
 
 ```{r}
 lc2017_scaled <- lc2017_2 %>% mutate_at(vars(Caffeine:Theophylline), scale)
 rda.2017 <- rda(lc2017_scaled %>% select(Caffeine:Theophylline) ~ mean_percent_damage, data = lc2017_scaled)
 ```
+
 
 2. How much total variance does the experimental design explain?
 
@@ -162,7 +164,7 @@ Marginally significant effect of leaf damage on metabolites.
 5. Loadings
 
 ```{r}
-MVA.get.loads(rda.2017)
+# MVA.get.loads(rda.2017)
 rda.2017$CCA$v %>% 
   as_tibble(rownames = "compound") %>% 
   arrange(RDA1)
@@ -306,12 +308,48 @@ Probably RDA is better since there are some correlations?
 
 1. Fit RDA model
 
+Added plant_num (i.e. sample processing order) as a conditional variable.  This pulls the variation from sample order out before doing the RDA---kind of like a random variable, but still a fixed variable, strictly speaking. I did this because samples were not refrigerated while I was processing them and the scanning was the bottleneck step, so samples later on were sitting on the counter longer.
 ```{r}
-lc2018_scaled <- lc2018_2 %>% 
+jgy_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
+lj_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Longjing"
+
+jgy_info <-
+  dir(jgy_path, "*.jpg", full.names = TRUE) %>%
+  file.info() %>% 
+  as.tibble(rownames = "paths") %>% 
+  mutate(plant_num = str_extract(paths, "\\d+(?=\\w?\\.jpg$)")) %>% 
+  mutate(sample = paste0("J", plant_num)) %>% 
+  mutate(mtime = if_else(sample == "J18",
+                         ymd_hms("2018-07-30 23:17:00") + hours(4),
+                         mtime)) %>% 
+  mutate(time = mtime - min(mtime))
+
+lj_info <-
+  dir(lj_path, "*.png", full.names = TRUE) %>% 
+  file.info() %>% 
+  as.tibble(rownames = "paths") %>% 
+  mutate(plant_num = str_extract(paths, "\\d+(?=\\w?\\.png$)")) %>% 
+  mutate(sample = paste0("L", plant_num)) %>% 
+  mutate(time = mtime - min(mtime))
+
+processing_time <-
+  bind_rows(jgy_info, lj_info) %>% 
+  select(sample, plant_num, time) %>% 
+  group_by(sample) %>% 
+  summarize(time = min(time))
+
+
+```
+
+```{r}
+lc2018_scaled <- 
+  lc2018_2 %>% 
   mutate_at(vars(Caffeine:Theobromine), scale) %>% 
-  mutate(cultivar = as.factor(cultivar))
+  mutate(cultivar = as.factor(cultivar)) %>% 
+  left_join(processing_time)
+
 rda.2018 <- 
-  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar,
+  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar + Condition(as.numeric(time)),
       data = lc2018_scaled)
 ```
 
@@ -321,7 +359,9 @@ rda.2018 <-
 MVA.synt(rda.2018)
 ```
 
-32.36% of variation explained by cultivar and leaf damage!
+Looks like sample order doesn't matter. Only 1.86% of variation.
+
+31.63% of variation explained by cultivar and leaf damage!
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -344,7 +384,7 @@ Significant effect of cultivar, no effect of damage.
 ```{r}
 rda.2018$CCA$v %>% 
   as_tibble(rownames = "compound") %>% 
-  arrange(RDA1)
+  arrange(desc(abs(RDA1)))
 
 
 MVA.plot(rda.2018, 
