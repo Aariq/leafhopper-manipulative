@@ -23,7 +23,7 @@ library(vegan)
 library(RVAideMemoire)
 
 library(ropls)
-# library(chemhelper)
+library(chemhelper) #for get_VIP
 # library(cowplot)
 # library(latex2exp)
 # library(webchem)
@@ -62,7 +62,6 @@ gc_wide
 
 
 # Data pre-treatment
-I'm going to log-transform and scale the wide data
 
 ```{r}
 #attribute stripper function
@@ -72,92 +71,171 @@ rm_attr <- function(x){
   }
 
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+```
+ 
+I already determined in the pre-treatment Rmd that log transformation followed by scaling is probably a good idea to improve normality.  However, the data is still zero-inflated, so it might be better to just use a distance based approach instead, which I think is "nonparametric".  Maybe it doesnt' really matter though since the permuation test for the RDA is nonparametric anyway.
 
-gc_wide.log <- 
+```{r}
+gc_wide.logscale <- 
   gc_wide %>% 
   mutate_at(vars(-metavars), log) %>%
-  mutate_at(vars(-metavars), scale) %>% 
+  mutate_at(vars(-metavars), scale) %>%
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr) %>% 
-  filter(sample != "Q2")
+  mutate_at(vars(-metavars), rm_attr) #%>%
+  # filter(sample != "Q2") #not going to remove from GC analysis
+
+gc_wide.log <-
+  gc_wide %>% 
+  mutate_at(vars(-metavars), log)
 ```
 
-Should I remove Q2?  This was the plant that had a large amount of damage for the # of leafhoppers.  Probably should be consistent across analyses.  Like
-
-"One sample (plant 2) was removed due to a large amount of damage for the leafhopper density.  In addition to that, another sample (plant 8) was removed from the GCMS dataset due to being an outlier as detected by hdoutliers"
 
 # Analysis
 
 ```{r}
-ggplot(gc_wide.log, aes(log(mean_percent_damage)))+ geom_histogram(bins = 10)
+ggplot(gc_wide.logscale, aes(log(mean_percent_damage)))+ geom_histogram(bins = 10)
 ```
 I might want to log-transofrm the percent damage data.
 
-## RDA
+## RDA for density
 1. Fit RDA model
 
 ```{r}
-rda_dens <- 
+#scaled, transformed
+rda_dens <-
+  rda(gc_wide.logscale %>% select(-metavars) ~ density_end,
+      data = gc_wide.logscale)
+
+#logged only??
+rda_dens2 <-
   rda(gc_wide.log %>% select(-metavars) ~ density_end,
       data = gc_wide.log)
-rda_dam <- 
-  rda(gc_wide.log %>% select(-metavars) ~ log(twister_damage),
-      data = gc_wide.log)
+
+#distance based on unscaled, untransformed data. Probs not worth it since you can't get loadings
+dbrda_dens <-
+  dbrda(gc_wide %>% select(-metavars) ~ density_end,
+      data = gc_wide.logscale)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda_dens)
-MVA.synt(rda_dam)
 ```
 
-yeesh, only 8.36% of variance explained by twister leaf damage, 9.67% explained by ending density
+
+yeesh, only 9.12% explained by ending density
+
+3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(rda_dens)
+```
+
+Significant effect of ending density on leaf volatiles
+
+4. Then we test for significance of individual factors and interaction terms:
+
+```{r}
+MVA.anova(rda_dens)
+```
+
+5. Loadings
+
+Ending density model:
+
+```{r}
+dens_loads <-
+  rda_dens$CCA$v %>% 
+  as_tibble(rownames = "Compound") %>% 
+  arrange(desc(abs(RDA1)))
+
+dens_cors <-
+  gc_tidy %>% 
+  group_by(Compound) %>% 
+  group_modify(~cor.test(~density_end + log(RPA), data = .x) %>% broom::glance(), keep = TRUE) %>% 
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  select(Compound, estimate, p.value, p.adj)
+
+full_join(dens_loads, dens_cors) %>% 
+  arrange(desc(abs(RDA1))) %>% 
+  filter(p.adj < 0.05)
+```
+
+Looks like similar to VIP scores from PLSR (below).  Compounds from density make a lot more sense.  Ugh...Do I just ignore the whole leaf image analysis stuff?
+
+
+## RDA for damage
+1. Fit RDA
+
+```{r}
+rda_dam <- 
+  rda(gc_wide.logscale %>% select(-metavars) ~ twister_damage,
+      data = gc_wide.logscale)
+```
+
+2. How much total variance does the experimental design explain?
+
+```{r}
+MVA.synt(rda_dam)
+```
+Twister leaf damage explains 8% of variation in loged scaled volatiles
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
 anova(rda_dam)
-anova(rda_dens)
 ```
-
-marginally significant effect of leaf damage on volatiles. Significant effect of ending density.
+Marginally significant
 
 4. Then we test for significance of individual factors and interaction terms:
 
 ```{r}
 MVA.anova(rda_dam)
-MVA.anova(rda_dens)
 ```
 
 5. Loadings
-Twister leaf damage model:
+
 ```{r}
-rda_dam$CCA$v %>% 
-  as_tibble(rownames = "compound") %>% 
+td_loads <- 
+  rda_dam$CCA$v %>% 
+  as_tibble(rownames = "Compound") %>% 
   arrange(desc(abs(RDA1)))
-```
-Ending density model:
-```{r}
-rda_dens$CCA$v %>% 
-  as_tibble(rownames = "compound") %>% 
-  arrange(desc(abs(RDA1)))
+
+td_cors <-
+  gc_tidy %>% 
+  group_by(Compound) %>% 
+  group_modify(~cor.test(~twister_damage + log(RPA), data = .x) %>% broom::glance(), keep = TRUE) %>% 
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  select(Compound, estimate, p.value, p.adj)
+
+full_join(td_loads, td_cors) %>% 
+  arrange(desc(abs(RDA1))) %>% 
+  filter(p.adj < 0.05)
 ```
 
-Looks like similar to VIP scores from PLSR (below).  Compounds from density make a lot more sense.  Ugh...Do I just ignore the whole leaf image analysis stuff?
+
+
+
+
+
+
+
 
 ## PLS-R by density_end
+
 
 ```{r}
 plsr_end <- opls(select(gc_wide.log, -metavars), gc_wide.log$density_end,
              scaleC = "standard",
-             predI = 1,
-             orthoI = NA,
+             # predI = 1,
+             # orthoI = NA,
+             permI = 200,
              plotL = FALSE)
-plot(plsr_end, parLabVc = gc_wide.log$sample)
+# plot(plsr_end, parLabVc = gc_wide.log$sample)
 ```
-super high R2Y, low Q2Y.
 
+RMSEE = 0.176 for log-transformed data and 0.2 for untransformed
 
 ## PLS-R by mean damage
 
@@ -167,43 +245,49 @@ super high R2Y, low Q2Y.
 plsr_md <- opls(select(gc_wide.log, -metavars),
                 log(gc_wide.log$mean_percent_damage),
              scaleC = "standard",
-             predI = 1,
-             orthoI = NA,
+             # predI = 1,
+             # orthoI = NA,
              plotL = FALSE)
-plot(plsr_md, parLabVc = gc_wide.log$sample)
+# plot(plsr_md, parLabVc = gc_wide.log$sample)
 ```
 
 ## PLS-R by damage to twister leaf
 
 ```{r}
-plsr_td <- opls(select(gc_wide.log, -metavars),
-                gc_wide.log$twister_damage,
-             scaleC = "standard",
-             predI = 1,
-             orthoI = NA,
-             plotL = FALSE)
-plot(plsr_td, parLabVc = gc_wide.log$sample)
+# plsr_td <- opls(select(gc_wide.log, -metavars),
+#                 gc_wide.log$twister_damage,
+#              scaleC = "standard",
+#              # predI = 1,
+#              # orthoI = NA,
+#              plotL = FALSE)
+# plot(plsr_td, parLabVc = gc_wide.log$sample)
 
 plsr_td_log <- opls(select(gc_wide.log, -metavars),
                 log(gc_wide.log$twister_damage),
              scaleC = "standard",
-             predI = 1,
-             orthoI = NA,
+             # predI = 1,
+             # orthoI = NA,
+             permI = 200,
              plotL = FALSE)
-plot(plsr_td_log, parLabVc = gc_wide.log$sample)
+# plot(plsr_td_log, parLabVc = gc_wide.log$sample)
 ```
 
-PLS by twister leaf damage is the best model (highest R2Y and Q2Y and lowest RMSEE).  I'll use that for future analyses.  The model with  log-transformed twister damage has lower RMSEE, so I might want to use that.
+PLS by twister leaf damage is the best model (highest R2Y and Q2Y and lowest RMSEE).  I'll use that for future analyses. 
 
 ## Extract VIP
 
 ```{r}
-VIPs <-
-  # get_VIP(plsr_end) %>%
+VIP_dens <-
+  get_VIP(plsr_end) %>%
+  arrange(desc(VIP)) %>%
+  rename(Compound = "Variable")
+VIP_dens
+
+VIP_dam <- 
   get_VIP(plsr_td) %>%
   arrange(desc(VIP)) %>%
   rename(Compound = "Variable")
-VIPs
+VIP_dam
 ```
 
 Different set of compounds associated with leaf damage than with leafhopper density. Hmmmmmmmmm
@@ -214,7 +298,7 @@ figured out with help from [stack overflow](https://goo.gl/9hacZe)
 
 ```{r message=FALSE, warning=FALSE}
 correlations <- 
-  gc_tidy.zeroes %>% 
+  gc_tidy %>% 
   select(-sample, -rt) %>%
   nest(-Compound) %>%
   mutate(cor.test = map(data,
@@ -224,17 +308,32 @@ correlations <-
   mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
   select(Compound, estimate, p.value, p.adj)
 
-VIPtable <- left_join(VIPs, correlations) %>% filter(VIP > 1)
-VIPtable
-# write_excel_csv(VIPtable, here("figs", "prelim VIP table.csv"))
+VIPtable_dens <- left_join(VIP_dens, correlations) %>% filter(VIP > 1)
+VIPtable_dens
 ```
+```{r message=FALSE, warning=FALSE}
+correlations <- 
+  gc_tidy %>% 
+  select(-sample, -rt) %>%
+  nest(-Compound) %>%
+  mutate(cor.test = map(data,
+                        ~cor.test(.$twister_damage, log(.$RPA), method = "spearman") %>%
+                          broom::glance(.))) %>% 
+  unnest(cor.test) %>% 
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  select(Compound, estimate, p.value, p.adj)
+
+VIPtable_dam <- left_join(VIP_dam, correlations) %>% filter(VIP > 1)
+VIPtable_dam
+```
+
 
 ### Summarise VIP results
 
 How many VIPs are positive correlations?  How many negative?
 
 ```{r}
-VIPtable %>%
+VIPtable_dam %>%
   summarise(num.pos = sum(estimate > 0),
             num.neg = sum(estimate < 0))
 ```
@@ -243,8 +342,8 @@ How many high VIPs also significant univariate (log) correlations?
 
 ```{r}
 VIPtable_strict <-
-  VIPtable %>%
-  filter(p.adj <= 0.05)
+  VIPtable_dam %>%
+  filter(p.adj <= 0.1)
 
 VIPtable_strict
 
