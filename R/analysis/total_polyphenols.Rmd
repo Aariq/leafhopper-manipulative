@@ -91,6 +91,7 @@ dens_dam_2017 <-
   theme_bw()
 
 dens_dam_2017 
+tp2017 %>% filter(sample == "Q2")
 ```
 
 Q2 stands out as extreme.  Inspection of the images shows that it includes 3 leaves with heavy hopperburn.
@@ -207,6 +208,7 @@ dens_dam_2018 <-
   theme_bw()
 
 dens_dam_2018
+tp2018 %>% filter(sample == "J23")
 ```
 
 J23 has really high damage. It has 3 completely dead leaves, which maybe should be excluded.
