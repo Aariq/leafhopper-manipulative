@@ -202,16 +202,7 @@ gc_tidy.4 <-
   mutate(RPA = RPA - background)
 ```
 
-# Remove rare peaks
 
-Remove compounds that are found in 3 or fewer samples.
-
-```{r}
-gc_tidy.5 <-
-  gc_tidy.4 %>% 
-  group_by(Compound) %>% #for each compound...
-  filter(sum(RPA > 0) >= 3)
-```
 
 
 # Read in treatment data and join
@@ -222,14 +213,14 @@ treatments <- read_rds(here('data', 'cleaned', '2017_treatment_data.rds'))
 
 
 ```{r}
-gc_tidy.6 <- left_join(gc_tidy.5, treatments)
+gc_tidy.5 <- left_join(gc_tidy.4, treatments)
 ```
 
 # Calculate retention indices
 
 ```{r}
-gc_tidy.7 <-
-  gc_tidy.6 %>% 
+gc_tidy.6 <-
+  gc_tidy.5 %>% 
   mutate(ri = calc_RI(rt, alkanes$rt, alkanes$C_num))
 ```
 
@@ -249,23 +240,36 @@ I want to deal with these values in two ways:
 On second thought, I think all I need is a tidy dataset with zeroes set to 1/IS and a column for present or not
 
 ```{r}
-gc_tidy.final <-
-  gc_tidy.7 %>%
-  mutate(RPA = case_when(ND      ~ 1/IS,
-                         Censor  ~ 1/IS,
-                         RPA <=0 ~ 1/IS,
+gc_tidy.7 <-
+  gc_tidy.6 %>%                             # Set RPA to a very small number...
+  mutate(RPA = case_when(ND            ~ 500/IS, # if peaks were always not detected
+                         Censor        ~ 500/IS, # or if their original areas were  < 1000
+                         RPA < 500/IS  ~ 500/IS, # or if their areas after background subtraction < 500
                          TRUE    ~ RPA),
-         present = case_when(ND      ~ FALSE,
-                             Censor  ~ FALSE,
-                             RPA <=0 ~ FALSE,
-                             TRUE    ~ TRUE)) %>%
+         present = case_when(ND           ~ FALSE,
+                             Censor       ~ FALSE,
+                             RPA <= 500/IS ~ FALSE,
+                             TRUE         ~ TRUE)) %>%
   select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, ri, present)
 
 #How many compounds detected in each sample?
-gc_tidy.final %>%
+gc_tidy.7 %>%
   group_by(sample) %>%
   summarize(num_compounds = sum(present))
 ```
+# Remove rare peaks
+
+Remove compounds that are found in 5 or fewer samples.
+
+```{r}
+gc_tidy.7 %>% count(Compound)
+gc_tidy.final <-
+  gc_tidy.7 %>% 
+  group_by(Compound) %>% #for each compound...
+  filter(sum(present) >= 5)
+gc_tidy.final %>% ungroup() %>% count(sample) #down to 94 compounds
+```
+0.001717365
 
 # Create wide data frame
 
@@ -280,13 +284,42 @@ gc_wide <-
 
 # Preliminary Data Analysis
 
+## Multivariate normality
+
+For some reason (data too large? numbers too small?) the `mvn()` function often fails due to a singular matrix error.  Below, I've run it on random subsets of the data and log transformation seems to improve normality. Interestingly, scaling seems to make things worse.
+
+```{r}
+gc_tidy.final %>% 
+  ggplot(aes(RPA)) + geom_histogram()
+gc_tidy.final %>% 
+  ggplot(aes(log(RPA))) + geom_histogram()
+```
+ 
+```{r}
+library(MVN)
+metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+test <-
+  gc_tidy.final %>%
+  ungroup() %>% 
+  select(-rt, -ri, -No., -present) %>% 
+  spread(key = Compound, value = RPA) %>% 
+  select(-metavars) %>%
+  mutate_all(~.*1000) %>%
+  mvn(mvnTest = "mardia",
+      transform = "log",
+      multivariatePlot = "qq",
+      scale = TRUE)
+test
+```
+
+So this dataset is clearly zero-inflated (or rather, small number introduced by data pre-treatment inflated).  I should consider distance-based methods as a sanity-check.
+
 ## Multivariate outlier detection
 
 Using Leland Wilkinson's algorithm from `HDoutliers`
 
 ```{r}
 library(HDoutliers)
-metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 out1 <- HDoutliers(select(gc_wide, -metavars), alpha = 0.1)
 gc_wide[out1, ]$sample
 #after log transformation
@@ -294,7 +327,7 @@ out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
 gc_wide[out2, ]
 ```
 
-Q8 shows up as an outlier in the log transformed data, but not in the untransformed data. It's not a particularly extreme level of damage or leafhopper density either.
+No outliers detected
 
 
 ## With PCA
@@ -312,7 +345,7 @@ plot(pca.2, parLabVc = gc_wide$sample)
 plot(pca.1, parLabVc = gc_wide$sample) #log transformed
 ```
 
-Q8 shows up as an outlier in both raw and log-transformed data.
+Q8 shows up as an outlier in log-transformed data.
 
 # Remove Outliers
 
@@ -337,11 +370,12 @@ plot(pca.4, parLabVc = gc_wide %>% filter(!sample %in% outliers) %>% .$sample)
 
 No, log improves I think.
 
-Remove outlier:
+
+I'm not going to remove this outlier.  I'm not convinved it's important to remove.
 
 ```{r}
-gc_wide <- gc_wide %>% filter(!sample %in% outliers) 
-gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers) 
+# gc_wide <- gc_wide %>% filter(!sample %in% outliers) 
+# gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers) 
 ```
 
 
