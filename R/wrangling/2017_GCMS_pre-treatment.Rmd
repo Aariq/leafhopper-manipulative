@@ -9,17 +9,28 @@ output:
     highlight: kate
     theme: yeti
 ---
-
+```{r setup}
+knitr::opts_chunk$set(
+	echo = TRUE
+)
+```
 *Last compiled: `r Sys.Date()`*
+
+# Packages
 
 ```{r packages, message=FALSE, warning=FALSE}
 library(tidyverse) #for data manipulation
-library(stringr) #for functions to deal with strings
 library(here)
-library(forcats)
 library(chemhelper)
-library(gglabeller)
-library(cowplot)
+
+#for outlier detection:
+library(MVN)
+library(HDoutliers)
+library(ropls)
+
+#resolve conflicts
+map <- purrr::map 
+mvn <- MVN::mvn
 ```
 
 
@@ -35,10 +46,9 @@ library(cowplot)
 This will give you sample data with 0s and possibly negative values for RPA and flags for nondetects and peaks that should be censored.
 
 7. Remove compounds that are not found in more than 2 samples (at least 3 samples) with RPA > 0
-8a. Set RPA for nondetects, censored, and all RPA <= 0  to 1/IS
-8b. Set RPA for nondetects, censored, and all RPA < 0 to 0 (for venn diagram)
+8. Set RPA for nondetects, censored, and all RPA <= 0  to 500/IS
 9. Check for and remove any obvious outliers
-10. Create wide dataframes from 8a and 8b.
+10. Create wide dataframe
 
 # Read in files
 
@@ -63,7 +73,6 @@ gc_tidy <- files %>%
   bind_rows(.id = "filename") %>% 
   rename(area = `Area [a.u.*s]`,
          rt = `R.Time [min.]`)
-
 ```
 
 ## Alkane Files
@@ -147,14 +156,6 @@ gc_tidy.1 <- gc_tidy %>%
   filter(!No. %in% problematic)
 ```
 
-# Manually check low Q-value compounds
-One last check for problematic peaks.
-
-```{r}
-gc_tidy.1 %>% 
-  filter(QVal < 90 & !ND & !Censor) %>%
-  arrange(sample, QVal)
-```
 
 # Calculate RPA
 
@@ -174,9 +175,9 @@ gc_tidy.2 <- gc_tidy.2 %>%
 gc_tidy.2
 ```
 
-# Method blank subtraction
+# Field blank subtraction
 
-I have two method blanks, one from the beginning and one from the end.  I could average them and subtract from all samples or subtract the start blank from the start samples and the end blank from the end samples.
+I have two field blanks, one from the beginning and one from the end.  I could average them and subtract from all samples or subtract the start blank from the start samples and the end blank from the end samples.
 
 For now, I'm just using the end data, so I'll just use the end blank.
 
@@ -229,15 +230,7 @@ TODO
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
-Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  There may be other RPA values <= 0 due to subtracting the method blank.
-
-I want to deal with these values in two ways:
-
-1. Set them all to zero.  This will be useful for calculating numbers of compounds detected in various samples and for making venn diagrams.
-
-2. Set them all to 1/IS.  This will be useful for log-transforming data since log(0) = -inf.
-
-On second thought, I think all I need is a tidy dataset with zeroes set to 1/IS and a column for present or not
+Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  I'll set them all to a small number (500/IS).  This will be useful for log-transforming data since log(0) = -inf.
 
 ```{r}
 gc_tidy.7 <-
@@ -259,7 +252,7 @@ gc_tidy.7 %>%
 ```
 # Remove rare peaks
 
-Remove compounds that are found in 5 or fewer samples.
+Remove compounds that are found in **5 or fewer** samples.
 
 ```{r}
 gc_tidy.7 %>% count(Compound)
@@ -282,7 +275,7 @@ gc_wide <-
 ```
 
 
-# Preliminary Data Analysis
+# Outlier detection
 
 ## Multivariate normality
 
@@ -296,15 +289,15 @@ gc_tidy.final %>%
 ```
  
 ```{r}
-library(MVN)
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+
 test <-
   gc_tidy.final %>%
   ungroup() %>% 
   select(-rt, -ri, -No., -present) %>% 
   spread(key = Compound, value = RPA) %>% 
   select(-metavars) %>%
-  mutate_all(~.*1000) %>%
+  # mutate_all(~.*1000) %>%
   mvn(mvnTest = "mardia",
       transform = "log",
       multivariatePlot = "qq",
@@ -341,42 +334,13 @@ pca.2 <-
   mutate_all(log) %>%
   opls(scaleC = "standard", plotL = FALSE)
 
-plot(pca.2, parLabVc = gc_wide$sample)
+# plot(pca.2, parLabVc = gc_wide$sample)
 plot(pca.1, parLabVc = gc_wide$sample) #log transformed
 ```
 
 Q8 shows up as an outlier in log-transformed data.
 
-# Remove Outliers
-
-```{r}
-outliers <- c("Q8")
-pca.3 <-
-  gc_wide %>%
-  filter(!sample %in% outliers) %>%
-  select(-metavars) %>%
-  opls(scaleC = "standard", plotL = FALSE, printL = FALSE)
-
-pca.4 <-
-  gc_wide %>%
-  filter(!sample %in% outliers) %>%
-  select(-metavars) %>% 
-  mutate_all(log) %>%
-  opls(scaleC = "standard", plotL = FALSE, printL = FALSE)
-
-plot(pca.3, parLabVc = gc_wide %>% filter(!sample %in% outliers) %>% .$sample)
-plot(pca.4, parLabVc = gc_wide %>% filter(!sample %in% outliers) %>% .$sample)
-```
-
-No, log improves I think.
-
-
 I'm not going to remove this outlier.  I'm not convinved it's important to remove.
-
-```{r}
-# gc_wide <- gc_wide %>% filter(!sample %in% outliers) 
-# gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers) 
-```
 
 
 # Write to file

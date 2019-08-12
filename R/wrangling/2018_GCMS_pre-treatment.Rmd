@@ -17,22 +17,49 @@ knitr::opts_chunk$set(
 *Last compiled: `r Sys.Date()`*
 # Packages
 
-```{r}
+```{r packages, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(chemhelper)
 library(here)
+
+#for outlier detection:
+library(MVN)
+library(HDoutliers)
+library(ropls)
+
+#resolve conflicts
+map <- purrr::map 
+mvn <- MVN::mvn
 ```
+# Workflow Overview
+
+1. Tag 0's as nondetects
+2. Tag 0<Area<1000 as censored
+3. Filter out known contaminants
+4. Calculate RPA
+5. Split data into samples and method blank
+6. Subtract RPAs of method blank
+
+This will give you sample data with 0s and possibly negative values for RPA and flags for nondetects and peaks that should be censored.
+
+7. Remove compounds that are not found in more than 2 samples (at least 3 samples) with RPA > 0
+8. Set RPA for nondetects, censored, and all RPA <= 0  to 500/IS
+9. Check for and remove any obvious outliers
+10. Create wide dataframe
 
 # Read in Data
+
 ## All the exported integration files
 
 Need to be connected to network drive for this to work!
 
 ```{r}
 Data.dir <- "/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data"
+
 if(!dir.exists(Data.dir)) {
   stop("Gotta connect to the network drive!")
 }
+
 files <- dir(Data.dir,
              pattern = "Shengzhou_adj Integration Report.csv",
              full.names = TRUE, #adds full path
@@ -51,6 +78,7 @@ gc_tidy
 
 ## Alkane files
 Read and wrangle
+
 ```{r}
 alkanes1 <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Data/073018_alkanemix/Meth_073018_alkanemix Integration Report.csv")
 alkanes_lj <-
@@ -125,13 +153,26 @@ gc_tidy.1 <-
 
 # Calculate RPA
 
+Two files have abnormally low values for the peak area of the internal standard.  I'll replace with the average of other files in that cultivar.
+
+I also noticed here that JGY and LJ cultivars internal standard peak areas are more than an order of magnitude different.  I probably should be cautios about comparing cultivars
+
 ```{r}
 #extract napthalene D8 area
 gc_IS <-
   gc_tidy.1 %>% 
   filter(Compound == "Naphthalene-D8") %>%
   rename(IS = area) %>% 
-  select(filename, IS)
+  select(filename, cultivar, IS)
+
+gc_IS %>% filter(IS < 100000)
+# JGY 11 and JGY 4
+
+# Replace bad IS areas with mean for cultivar.
+gc_IS <- 
+  gc_IS %>%
+  group_by(cultivar) %>%
+  mutate(IS = ifelse(IS < 100000, mean(IS), IS))
 
 #join with gc.tidy and mutate to calculate RPA
 gc_tidy.2 <- full_join(gc_tidy.1, gc_IS)
@@ -142,9 +183,9 @@ gc_tidy.2 <- gc_tidy.2 %>%
 # gc_tidy.2 %>% filter(str_detect(filename, "Jin")) %>% count(filename)
 ```
 
-# Method blank subtraction
+# Field blank subtraction
 
-I have two method blanks, one for each cultivar
+I have two field blanks, one for each cultivar
 
 ```{r}
 gc_tidy.3 <- 
@@ -164,10 +205,8 @@ gc_tidy.3 <-
   bind_rows()
 ```
 
-Two ways of dealing with blanks:
+I'm literally subtracting the blank.  The alternative is Nicole's method: if RPA > background then keep it as is, if RPA <= background, set to zero.
 
-1. Literal subtraction
-2. Nicole's method: if RPA > background then keep it as is, if RPA <= background, set to zero.
 ```{r}
 gc_tidy.4 <- gc_tidy.3 %>% 
   mutate(RPA = RPA-background)
@@ -175,32 +214,18 @@ gc_tidy.4
 ```
 
 
-# Remove rare peaks
-Should this be done before or after blank subtraction?
-Remove compounds that are found in 3 or fewer samples.
-
-```{r}
-gc_tidy.5 <-
-  gc_tidy.4 %>% 
-  group_by(Compound) %>% #for each compound...
-  filter(sum(RPA > 0) >= 3) #calculate the number of rows where RPA > 0 then filter the dataframe to keep only those where that sum is greater than or equal to 3
-
-# gc_tidy.4 %>% count(filename) #536 compounds
-# gc_tidy.5 %>% ungroup() %>% count(filename) #359 compounds
-```
-
 # Read in leafhopper density and damage data and join
 
 ```{r}
 treatments <- read_rds(here('data', 'cleaned', '2018_treatment_data.rds'))
-gc_tidy.6 <- left_join(gc_tidy.5, treatments)
+gc_tidy.5 <- left_join(gc_tidy.4, treatments)
 ```
 
 # Calculate Retention Indices
 
 ```{r}
-gc_tidy.7 <-
-  gc_tidy.6 %>% 
+gc_tidy.6 <-
+  gc_tidy.5 %>% 
   mutate(ri = case_when(cultivar == "J" ~ calc_RI(rt, alkanes_jgy$rt, alkanes_jgy$C_num),
                         cultivar == "L" ~ calc_RI(rt, alkanes_lj$rt, alkanes_lj$C_num)))
 ```
@@ -212,15 +237,15 @@ TODO
 
 Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  There may be other RPA values <= 0 due to subtracting the method blank.
 
-I'll set all zeroes to 1/IS.  This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
+I'll set all zeroes to 500/IS.  This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
 
 
 ```{r}
-gc_tidy.final <-
-  gc_tidy.7 %>%
-  mutate(RPA = case_when(ND      ~ 1/IS,
-                         Censor  ~ 1/IS,
-                         RPA <=0 ~ 1/IS,
+gc_tidy.7 <-
+  gc_tidy.6 %>%
+  mutate(RPA = case_when(ND           ~ 500/IS,
+                         Censor       ~ 500/IS,
+                         RPA <=500/IS ~ 500/IS, #if after background subtraction peak areas < 500
                          TRUE    ~ RPA),
          present = case_when(ND      ~ FALSE,
                              Censor  ~ FALSE,
@@ -229,14 +254,26 @@ gc_tidy.final <-
   select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, ri, present)
 
 #How many compounds detected in each sample?
-gc_tidy.final %>%
+gc_tidy.7 %>%
   group_by(sample) %>%
   summarize(num_compounds = sum(present))
 ```
 
+# Remove rare peaks
+
+Remove compounds that are found in 5 or fewer samples.
+
+```{r}
+gc_tidy.final <-
+  gc_tidy.7 %>% 
+  group_by(Compound) %>% #for each compound...
+  filter(sum(present) >= 5) #calculate the number of rows where RPA > 0 then filter the dataframe to keep only those where that sum is greater than or equal to 3
+
+# gc_tidy.4 %>% count(filename) #536 compounds
+gc_tidy.final %>% ungroup() %>% count(sample) #326 compounds
+```
 
 # Create wide dataframe for multivariate analysis
-
 
 Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.0 with the `pivot_wider()` function, but I don't think its so important that I need to use a development version of a package.
 
@@ -248,35 +285,61 @@ gc_wide <-
 ```
 
 # Outlier detection
+## Multivariate normality
 
+For some reason (data too large? numbers too small?) the `mvn()` function often fails due to a singular matrix error.  Below, I've run it on random subsets of the data and log transformation seems to improve normality. Interestingly, scaling seems to make things worse.
+
+```{r}
+gc_tidy.final %>% 
+  ggplot(aes(RPA)) + geom_histogram() + facet_wrap(~cultivar)
+gc_tidy.final %>% 
+  ggplot(aes(log(RPA))) + geom_histogram() +facet_wrap(~cultivar)
+```
 This may change once the data is finalized.
 
 ```{r}
-library(HDoutliers)
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
-out <- HDoutliers(select(gc_wide, -metavars) , alpha = 0.1)
-out
-gc_wide[out,]$sample
+
 ```
-J4 and J11 are outliers
+ 
+```{r eval=FALSE}
+test <-
+  gc_tidy.final %>%
+  ungroup() %>% 
+  select(-rt, -ri, -No., -present) %>% 
+  spread(key = Compound, value = RPA) %>% 
+  select(-metavars) %>%
+  # mutate_all(~.*1000) %>%
+  mvn(mvnTest = "mardia",
+      transform = "log",
+      multivariatePlot = "qq",
+      scale = TRUE)
+test
+```
+
+## Multivariate outlier detection
+
+Using Leland Wilkinson's algorithm from `HDoutliers`
 
 ```{r}
-library(ropls)
+out <- HDoutliers(select(gc_wide, -metavars) , alpha = 0.1)
+gc_wide[out, ]
+
+#after log transformation
+out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
+gc_wide[out2, ]
+```
+No outliers detected
+
+## With PCA
+
+```{r}
 pca <- opls(select(gc_wide, -metavars)%>% mutate_all(log) , plotL = FALSE, predI = 2)
 plot(pca, parLabVc = gc_wide$sample)
 ```
 
-Here, J4 and J11 are really weird outliers.  Turns out the internal standard peaks are very small for some reason.  I'm guessing just a mistake applying it to the Twister.
+L15 is maybe an extreme value, but not worth removing.
 
-# Remove outliers
-
-I *could* fix these files by using the average Naphthalene-D8 peak from all the other files instead.  Nicole suggested this.
-
-```{r}
-outliers <- c("J4", "J11")
-gc_tidy.final <- gc_tidy.final %>% filter(!sample %in% outliers)
-gc_wide <- gc_wide %>% filter(!sample %in% outliers)
-```
 
 
 # Write to file
