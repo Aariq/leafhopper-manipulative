@@ -250,17 +250,31 @@ gc_tidy.7 %>%
   group_by(sample) %>%
   summarize(num_compounds = sum(present))
 ```
+
+Preserve zeroes for distance-based RDA:
+
+```{r}
+gc_zeroes <-
+  gc_tidy.7 %>% 
+  mutate(RPA = ifelse(present, RPA, 0))
+```
+
 # Remove rare peaks
 
 Remove compounds that are found in **5 or fewer** samples.
 
 ```{r}
-gc_tidy.7 %>% count(Compound)
 gc_tidy.final <-
   gc_tidy.7 %>% 
   group_by(Compound) %>% #for each compound...
   filter(sum(present) >= 5)
 gc_tidy.final %>% ungroup() %>% count(sample) #down to 94 compounds
+
+gc_zeroes.final <-
+  gc_zeroes %>% 
+  group_by(Compound) %>% 
+  filter(sum(present) >= 5)
+gc_zeroes.final %>% ungroup() %>% count(sample) #just checking that it's the same
 ```
 0.001717365
 
@@ -271,6 +285,12 @@ gc_wide <-
   gc_tidy.final %>%
   ungroup() %>% 
   select(-rt, -ri, -No., -present) %>%
+  spread(key = Compound, value = RPA)
+
+gc_wide.zeroes <-
+  gc_zeroes.final %>% 
+  ungroup %>% 
+  select(-rt, -ri, -No., -present) %>% 
   spread(key = Compound, value = RPA)
 ```
 
@@ -348,4 +368,5 @@ I'm not going to remove this outlier.  I'm not convinved it's important to remov
 ```{r}
 write_rds(gc_wide, here("data", "cleaned", "2017_gcms_wide.rds"))
 write_rds(gc_tidy.final, here("data", "cleaned", "2017_gcms_tidy.rds"))
+write_rds(gc_wide.zeroes, here("data", "cleaned", "2017_gcms_zeroes.rds"))
 ```
