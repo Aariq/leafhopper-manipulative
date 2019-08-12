@@ -168,11 +168,17 @@ gc_IS <-
 gc_IS %>% filter(IS < 100000)
 # JGY 11 and JGY 4
 
+JGY_IS_MEAN <- 
+  gc_IS %>%
+  filter(IS > 100000, cultivar == "J") %>%
+  pull(IS) %>%
+  mean()
+
 # Replace bad IS areas with mean for cultivar.
 gc_IS <- 
   gc_IS %>%
   group_by(cultivar) %>%
-  mutate(IS = ifelse(IS < 100000, mean(IS), IS))
+  mutate(IS = ifelse(IS < 100000, JGY_IS_MEAN, IS))
 
 #join with gc.tidy and mutate to calculate RPA
 gc_tidy.2 <- full_join(gc_tidy.1, gc_IS)
