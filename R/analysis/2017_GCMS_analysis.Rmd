@@ -22,11 +22,8 @@ library(here)
 library(vegan)
 library(RVAideMemoire)
 
-library(ropls)
-library(chemhelper) #for get_VIP
-# library(cowplot)
-# library(latex2exp)
-# library(webchem)
+# library(ropls)
+# library(chemhelper) #for get_VIP
 ```
 
 # Purpose
@@ -35,10 +32,11 @@ What is the goal of this notebook?
 
 # Load Data
 Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
+
 ```{r data, echo=TRUE}
 gc_wide <- read_rds(here("data", "cleaned", "2017_gcms_wide.rds"))
 gc_tidy <- read_rds(here("data", "cleaned", "2017_gcms_tidy.rds"))
-gc_wide
+gc_wide.zeroes <- read_rds(here("data", "cleaned", "2017_gcms_zeroes.rds"))
 ```
 
 ## Data Dictionary
@@ -83,6 +81,11 @@ gc_wide.logscale <-
   mutate_at(vars(-metavars), scale) %>%
   #strip atrributes left by scale() that interfere with some other functions down the road
   mutate_at(vars(-metavars), rm_attr)
+
+gc_wide.zeroes <- 
+  gc_wide.zeroes %>% 
+  mutate_at(vars(-metavars), scale) %>% 
+  mutate_at(vars(-metavars), rm_attr)
 ```
 
 I may also want to log-transform the percent leaf damage data, but I can do that ad-hoc later.
@@ -108,22 +111,25 @@ rda_dens <-
 
 #distance based on unscaled, untransformed data.
 dbrda_dens <-
-  dbrda(gc_wide %>% select(-metavars) ~ density_end,
-      data = gc_wide.logscale)
+  dbrda(gc_wide.zeroes %>% select(-metavars) ~ density_end,
+      data = gc_wide.zeroes)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda_dens)
+# MVA.synt(dbrda_dens)
 ```
 
 yeesh, only 9.12% explained by ending density
+29.24% using the distance-based model with untransformed data.  BUT, I think this is wrong.
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
 anova(rda_dens)
+# anova(dbrda_dens)
 ```
 
 Significant effect of ending density on leaf volatiles
@@ -132,6 +138,7 @@ Significant effect of ending density on leaf volatiles
 
 ```{r}
 MVA.anova(rda_dens)
+# MVA.anova(dbrda_dens)
 ```
 
 5. Loadings / Correlations
@@ -139,6 +146,8 @@ MVA.anova(rda_dens)
 I need to extract loadings, then figure out which compounds are signifcantly correlated with RDA axis, **not** with leafhopper density.  Should be correlation of scores with data.
 
 ```{r}
+# MVA.scores(dbrda_dens)
+
 scores <- MVA.scores(rda_dens)$coord
 loads <- MVA.load(rda_dens)$loads %>% rename(loading = `Constr. comp. 1`)
 
@@ -146,7 +155,7 @@ data <- gc_wide.logscale %>% select(-metavars)
 
 
 map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
-  bind_cols(loads) %>% 
+  bind_cols(loads) %>%
   mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
   filter(p.adj < 0.05) %>%
   select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
@@ -164,14 +173,20 @@ Here, I should plot these biomarkers and look for thresholds/non-linear patterns
 rda_dam <- 
   rda(gc_wide.logscale %>% select(-metavars) ~ twister_damage,
       data = gc_wide.logscale)
+
+dbrda_dam <- 
+  dbrda(gc_wide.zeroes %>% select(-metavars) ~ twister_damage,
+      data = gc_wide.zeroes, distance = "euclidean")
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda_dam)
+# MVA.synt(dbrda_dam)
 ```
-Twister leaf damage explains 8% of variation in loged scaled volatiles
+Twister leaf damage explains 8% of variation in loged scaled volatiles. 
+8.33% if I use a distance-based RDA
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -187,6 +202,7 @@ MVA.anova(rda_dam)
 ```
 
 5. Loadings / Correlations
+
 ```{r}
 scores <- MVA.scores(rda_dam)$coord
 loads <- MVA.load(rda_dam)$loads %>% rename(loading = `Constr. comp. 1`)
@@ -195,7 +211,7 @@ data <- gc_wide.logscale %>% select(-metavars)
 
 
 map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
-  bind_cols(loads) %>% 
+  bind_cols(loads) %>%
   mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
   filter(p.adj < 0.05) %>%
   select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
