@@ -33,7 +33,7 @@ Read in cleaned GCMS data (which includes leafhopper density already) and leafho
 ```{r data, echo=TRUE}
 gc_wide <- read_rds(here("data", "cleaned", "2018_gcms_wide.rds"))
 gc_tidy <- read_rds(here("data", "cleaned", "2018_gcms_tidy.rds"))
-gc_wide
+gc_wide.zeroes <- read_rds(here("data", "cleaned", "2018_gcms_zeroes.rds"))
 ```
 
 ## Data Dictionary
@@ -68,44 +68,54 @@ rm_attr <- function(x){
 
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 
-gc_wide.log <- 
+```
+ 
+```{r}
+gc_wide.logscale <- 
   gc_wide %>% 
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr) %>% 
-  filter(sample != "J23")
+  mutate_at(vars(-metavars), rm_attr)
+
+gc_wide.zeroes <-
+  gc_wide.zeroes %>% 
+  mutate_at(vars(-metavars), scale) %>% 
+  #strip atrributes left by scale() that interfere with some other functions down the road
+  mutate_at(vars(-metavars), rm_attr)
 ```
 
-Should I remove J23?  This was the plant that had a large amount of damage for the # of leafhoppers.  Probably should be consistent across analyses. Like:
-
-"One sample (plant J23) was removed due to a large amount of damage for the leafhopper density.  In addition to that, two other samples (plants J4 and J11) was removed from the GCMS dataset due to being an outlier as detected by hdoutliers"
-
-# Analysis
-
 ```{r}
-ggplot(gc_wide.log, aes(log(mean_percent_damage)))+ geom_histogram(bins = 10)
+ggplot(gc_wide.logscale, aes(log(mean_percent_damage)))+ geom_histogram(bins = 10)
 ```
 I might want to log-transofrm the percent damage data.
 
-## RDA
+# Analysis
+
+## RDA for density
 1. Fit RDA model
 
 ```{r}
 #using ending density
 rda_dens <- 
-  rda(gc_wide.log %>% select(-metavars) ~ density_end*cultivar,
-      data = gc_wide.log)
-
+  rda(gc_wide.logscale %>% select(-metavars) ~ density_end*cultivar,
+      data = gc_wide.logscale)
+#distance based on unscaled, untransformed data.
+dbrda_dens <-
+  dbrda(gc_wide.zeroes %>% select(-metavars) ~ density_end,
+      data = gc_wide.zeroes)
+```
+ 
+```{r}
 #using mean percent damage
 rda_dam <- 
-  rda(gc_wide.log %>% select(-metavars) ~ log(mean_percent_damage)*cultivar,
-      data = gc_wide.log)
+  rda(gc_wide.logscale %>% select(-metavars) ~ (mean_percent_damage)*cultivar,
+      data = gc_wide.logscale)
 
 #using twister leaf
-gc_wide.t <- gc_wide.log %>% filter(!is.na(twister_damage))
+gc_wide.t <- gc_wide.logscale %>% filter(!is.na(twister_damage))
 rda_t <-
-  rda(gc_wide.t %>% select(-metavars) ~ log(twister_damage)*cultivar,
+  rda(gc_wide.t %>% select(-metavars) ~ (twister_damage)*cultivar,
       data = gc_wide.t)
 ```
 
@@ -116,9 +126,9 @@ MVA.synt(rda_dens)
 MVA.synt(rda_dam)
 MVA.synt(rda_t)
 ```
-Density*cultivar explains 34.77% of variation
-Damage*cultivar explains 34.89% of variation
-Twister leaf damage*cultivar explains 32.04% of variation (less data here)
+Density*cultivar explains 75.97% of variation
+Damage*cultivar explains 76.37% of variation
+Twister leaf damage*cultivar explains 71.73% of variation (less data here)
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -139,4 +149,135 @@ MVA.anova(rda_t)
 ```
 
 Yup, only effect of cultivar `r emo::ji("sob")`
+
+```{r}
+rda_cultivar <- rda(gc_wide.logscale %>% select(-metavars) ~ cultivar,
+      data = gc_wide.logscale)
+MVA.synt(rda_cultivar)
+anova(rda_cultivar)
+MVA.anova(rda_cultivar)
+```
+
+```{r}
+scores <- MVA.scores(rda_cultivar)$coord
+loads <- MVA.load(rda_cultivar)$loads %>% rename(loading = `Constr. comp. 1`)
+
+MVA.plot(rda_cultivar, fac = gc_wide.logscale$cultivar)
+
+
+df <- map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
+  bind_cols(loads) %>%
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  filter(p.adj < 0.05) %>%
+  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
+  arrange(desc(abs(loading)))
+df %>% mutate(pos = loading > 0, neg = loading <=0) %>% 
+  count(neg)
+```
+
+positive loading means greater concentration in J. negative loading means greater concentration in L.
+
+# Splitting by cultivar
+
+I don't really believe that ALL compounds were in higher concentration in one cultivar.  Seems like differences in sampling/running on GCMS.  Let's split the cultivars and run separate RDAs
+
+```{r}
+gc_jgy <- gc_wide.logscale %>% 
+  filter(cultivar == "J")
+gc_lj <- gc_wide.logscale %>% 
+  filter(cultivar == "L")
+```
+
+```{r}
+rda_jgy_dens <- 
+  rda(gc_jgy %>% select(-metavars) ~ density_end,
+      data = gc_jgy)
+anova(rda_jgy_dens)
+
+rda_jgy_dam <- 
+  rda(gc_jgy %>% select(-metavars) ~ mean_percent_damage,
+      data = gc_jgy)
+anova(rda_jgy_dam)
+
+rda_jgy_t <- 
+  rda(gc_jgy %>% filter(!is.na(twister_damage)) %>% select(-metavars) ~ twister_damage,
+      data = gc_jgy %>% filter(!is.na(twister_damage)))
+anova(rda_jgy_t)
+```
+
+```{r}
+rda_lj_dens <-
+  rda(gc_lj %>% select(-metavars) ~ density_end,
+      data = gc_lj)
+anova(rda_lj_dens)
+
+rda_lj_dam <-
+  rda(gc_lj %>% select(-metavars) ~ mean_percent_damage,
+      data = gc_lj)
+anova(rda_lj_dam)
+
+gc_lj.t <- gc_lj %>% filter(!is.na(twister_damage))
+rda_lj_t <-
+  rda(gc_lj.t %>% select(-metavars) ~ mean_percent_damage,
+      data = gc_lj.t)
+anova(rda_lj_t)
+```
+
+```{r}
+rda_lj_dam$CCA$v %>% as_tibble(rownames = "compound") %>% arrange(desc(abs(RDA1)))
+```
+
+
+#PLSR
+
+```{r}
+library(ropls)
+```
+
+```{r}
+pls_lj_dens <-
+  opls(gc_lj %>% select(-metavars), gc_lj$density_end,
+       scale = "none",
+       permI = 500,
+       plotL = FALSE)
+
+pls_lj_dam <-
+  opls(gc_lj %>% select(-metavars), gc_lj$mean_percent_damage,
+       scale = "none",
+       permI = 500,
+       plotL = FALSE)
+
+gc_lj.t <- gc_lj %>% filter(!is.na(twister_damage))
+
+pls_lj_t <-
+  opls(gc_lj.t %>% select(-metavars), gc_lj.t$twister_damage,
+       scale = "none",
+       permI = 500,
+       plotL = FALSE)
+
+get_VIP(pls_lj_dam) %>% arrange(desc(VIP))  
+```
+```{r}
+pls_jgy_dens <-
+  opls(gc_jgy %>% select(-metavars), gc_jgy$density_end,
+       scale = "none",
+       permI = 500,
+       predI = 1,
+       plotL = FALSE)
+
+pls_jgy_dam <-
+  opls(gc_jgy %>% select(-metavars), gc_jgy$mean_percent_damage,
+       scale = "none",
+       permI = 500,
+       predI = 1,
+       plotL = FALSE)
+
+gc_jgy.t <- gc_jgy %>% filter(!is.na(twister_damage))
+pls_jgy_dam <-
+  opls(gc_jgy.t %>% select(-metavars), gc_jgy.t$twister_damage,
+       scale = "none",
+       permI = 500,
+       predI = 1,
+       plotL = FALSE)
+```
 
