@@ -21,9 +21,8 @@ library(here)
 #for RDA:
 library(vegan)
 library(RVAideMemoire)
-
-# library(ropls)
-# library(chemhelper) #for get_VIP
+#for figures:
+library(cowplot)
 ```
 
 # Purpose
@@ -154,7 +153,8 @@ loads <- MVA.load(rda_dens)$loads %>% rename(loading = `Constr. comp. 1`)
 data <- gc_wide.logscale %>% select(-metavars)
 
 
-map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
+dens_biomarkers <-
+  map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
   bind_cols(loads) %>%
   mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
   filter(p.adj < 0.05) %>%
@@ -163,8 +163,28 @@ map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id
 ```
 
 ## Univariate plots
-Here, I should plot these biomarkers and look for thresholds/non-linear patterns.
 
+```{r}
+dens_data <- gc_tidy %>% filter(Compound %in% pull(dens_biomarkers, compound))
+
+dens_plot <-
+  ggplot(dens_data, aes(x = density_end, y = RPA, color = Compound)) +
+  geom_point() +
+  facet_wrap(~Compound, scales = "free_y") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Leafhopper density (insects / young leaf)",
+       y = "Relative peak area")
+dens_plot
+```
+
+```{r}
+save_plot(here("figs", "density-biomarkers.png"), dens_plot,
+          ncol = 4,
+          nrow = 4, 
+          base_height = 2,
+          base_asp = 1.3)
+```
 
 ## RDA for damage
 1. Fit RDA
@@ -210,16 +230,42 @@ loads <- MVA.load(rda_dam)$loads %>% rename(loading = `Constr. comp. 1`)
 data <- gc_wide.logscale %>% select(-metavars)
 
 
-map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
+dam_biomarkers <-
+  map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
   bind_cols(loads) %>%
   mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
   filter(p.adj < 0.05) %>%
   select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
   arrange(desc(abs(loading)))
+dam_biomarkers
 ```
 
 ## Univariate plots
+
 Here, I should plot these biomarkers and look for thresholds/non-linear patterns.
+
+```{r}
+dam_data <- gc_tidy %>% filter(Compound %in% pull(dam_biomarkers, compound))
+
+dam_plot <-
+  ggplot(dam_data, aes(x = twister_damage, y = RPA, color = Compound)) +
+  geom_point() +
+  facet_wrap(~Compound, scale = "free_y") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "% Damage to DCSE leaf",
+       y = "Relative peak area")
+dam_plot
+```
+
+```{r}
+save_plot(here("figs", "damage-biomarkers.png"), dam_plot,
+          ncol = 3,
+          nrow = 2,
+          base_height = 2,
+          base_asp = 1.3)
+```
+
 
 # Annotating biomarkers
 
