@@ -8,6 +8,7 @@ output:
     theme: yeti
     toc: yes
     toc_float: yes
+    number_sections: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -31,6 +32,7 @@ library(modelr)
 library(glue)
 library(cowplot)
 
+here <- here::here #make sure to override the here() function from lubridate
 ```
 
 # Purpose
@@ -45,7 +47,6 @@ lc2017 <- read_rds(here("data", "cleaned", "2017_lcms_wide.rds")) %>%
 lc2018 <- read_rds(here("data", "cleaned", "2018_lcms_wide.rds")) %>% 
   filter(sample != "J23") #determined elswhere that this has an unusually high ammount of damage for the treatment
 
-
 lc2017_tidy <-
   read_rds(here('data', 'cleaned', '2017_lcms_tidy.rds')) %>% 
   filter(sample != "Q2")
@@ -53,7 +54,6 @@ lc2017_tidy <-
 lc2018_tidy <- 
   read_rds(here('data', 'cleaned', '2018_lcms_tidy.rds')) %>% 
   filter(sample != "J23")
-
 ```
 
 ## Data Dictionary
@@ -83,7 +83,7 @@ vis_dat(lc2018)
 
 
 ```{r}
-min(lc2017_tidy$conc_ug_mg, na.rm = TRUE)
+# min(lc2017_tidy$conc_ug_mg, na.rm = TRUE)
 
 lc2017_tidy <- 
   lc2017_tidy %>% 
@@ -95,7 +95,7 @@ lc2017_2 <-
   mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
   select(-`Catechin gallate`) #all zeroes
 
-min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
+# min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
 lc2018_tidy <-
   lc2018_tidy %>% 
   filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #all zeros for all samples
@@ -134,8 +134,12 @@ Probably RDA is better since there are some correlations?
 1. Fit RDA model
 
 ```{r}
-lc2017_scaled <- lc2017_2 %>% mutate_at(vars(Caffeine:Theophylline), scale)
-rda.2017 <- rda(lc2017_scaled %>% select(Caffeine:Theophylline) ~ mean_percent_damage, data = lc2017_scaled)
+lc2017_scaled <-
+  lc2017_2 %>%
+  mutate_at(vars(Caffeine:Theophylline), scale)
+
+rda.2017 <-
+  rda(lc2017_scaled %>% select(Caffeine:Theophylline) ~ mean_percent_damage, data = lc2017_scaled)
 ```
 
 
@@ -166,159 +170,65 @@ Marginally significant effect of leaf damage on metabolites.
 5. Loadings
 
 ```{r}
-# MVA.get.loads(rda.2017)
-rda.2017$CCA$v %>% 
-  as_tibble(rownames = "compound") %>% 
-  arrange(RDA1)
+# MVA.scores(dbrda_dens)
+
+scores <- MVA.scores(rda.2017)$coord
+loads <- MVA.load(rda.2017)$loads %>% rename(loading = `Constr. comp. 1`)
+
+data <- lc2017_2 %>% select(Caffeine:Theophylline)
+
+
+lc_biomarkers_2017 <-
+  map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
+  bind_cols(loads) %>%
+  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
+  filter(p.adj < 0.05) %>%
+  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
+  arrange(desc(abs(loading)))
+lc_biomarkers_2017
 ```
 
-Top contributors: EGCG, Caffeine, Theobromine.  All negative relationship with mean % damage.
 
-## Regression analysis
+Top contributors: EGCG, Caffeine, Theobromine, ECG.  All negative relationship with mean % damage.
 
-Best way would be to load in the **tidy** versions of the data, do the same filtering (remove Q2, etc.), and then use tidyverse magic do all the regressions.
-
+## Plots
 
 ```{r}
-results <-
-  lc2017_tidy %>% 
-  select(sample, compound, conc_ug_mg, mean_percent_damage, density_end) %>% 
-  group_by(compound) %>% 
-  nest() %>% #creates list column of data for each compound
-  mutate(lm = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, .))) %>%  # apply a linear model to each compound
-  mutate(poly = map(data, ~lm(conc_ug_mg ~ poly(mean_percent_damage, 2), .))) %>%  # apply a polynomial model
-  mutate(null = map(data, ~lm(conc_ug_mg ~ 1, .))) %>% # apply a null model
-  select(compound, data, lm, poly, null) %>% 
-  gather(-compound, -data, key = model.type, value = model) %>% #gather up all the models into one column
-  mutate(stats = map(model, glance)) %>% #extract model stats
-  unnest(stats) %>%
-  group_by(compound) %>% 
-  arrange(compound, AIC) %>% #figure out best model
-  mutate(dAIC =  nth(AIC, 3)- AIC,
-         dDF = nth(df, 3) - df) %>% #calculate dAIC
-  select(compound, model.type, dAIC, dDF, p.value, everything())
-
-results
-```
-
-Looks like EGCG has a pretty strong significant negative relationship with damage.  Makes sense as EGCG would be converted into theaflavins and other polymerized compounds.
-
-- Caffeine: linear, **p = 0.05**
-- Catechin: polynomial, p = 0.09
-- Epicatechin: polynomial, p = 0.16
-- Epicatechin gallate: linear, p = 0.096
-- Epigallocatechin: null
-- Epigallocatechin gallate: linear, **p = 0.0003**
-- Gallic acid: null
-- Gallocatechin: null
-- Gallocatechin gallate: linear, p = 0.086
-- L-theanine: null
-- Paraxanthine: null
-- Theobromine: linear, **p = 0.05**
-- Theophylline: null
-
-### Plotting results
-
-First, creating a dataframe with only the "winning" models:
-
-```{r}
-results2 <-
-  results %>% 
-  filter(
-    compound == "Caffeine" & model.type == "lm" |
-      compound == "Catechin" & model.type == "poly" |
-      compound == "Epicatechin" & model.type == "poly" |
-      compound == "Epicatechin gallate" & model.type == "lm" |
-      compound == "Epigallocatechin" & model.type == "null" |
-      compound == "Epigallocatechin gallate" & model.type == "lm" |
-      compound == "Gallic acid" & model.type == "null" |
-      compound == "Gallocatechin" & model.type == "null" |
-      compound == "Gallocatechin gallate" & model.type == "lm" |
-      compound == "L-theanine" & model.type == "null" |
-      compound == "Paraxanthine" & model.type == "null" |
-      compound == "Theobromine" & model.type == "lm" |
-      compound == "Theophylline" & model.type == "null"
-  )
-```
-
-#### plot with facet_wrap()
-
-Using `facet_wrap()` and two `geom_smooth()`s.  Pros: easier to read code.  Cons: more difficult to annotate with p-values? Maybe a custom labeller function?
-
-```{r}
-df <- full_join(lc2017_tidy, select(results2, compound, model.type, p.value))
-df <- df %>% 
-  mutate(compound = case_when(compound == "Caffeine" ~ "Caffeine(*)",
-                              compound == "Epigallocatechin gallate" ~ "Epigallocatechin gallate(***)",
-                              compound == "Theobromine" ~ "Theobromine(*)",
-                              TRUE ~ as.character(compound)))
-lc2017_plot <-
-  ggplot(df, aes(x = mean_percent_damage, y = conc_ug_mg)) +
+lc_plotdata.2017 <- lc2017_tidy %>% filter(compound %in% pull(lc_biomarkers_2017, compound))
+lc_plot.2017 <-
+  ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg, color = compound)) +
   geom_point() +
-  geom_smooth(method = "lm", data = filter(df, model.type == "lm")) +
-  geom_smooth(method = "lm", formula = "y ~ poly(x,2)", data = filter(df, model.type == "poly")) +
+  # geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~compound, scales = "free_y") +
-  labs(x = "Mean % damaged leaf area",
-       y = "Concentration (µg/mg)",
-       subtitle = "2017",
-       caption = " (*): p = 0.05\n(***): p < 0.001") +
   theme_bw() +
-  theme(legend.position = "none")
-lc2017_plot
-save_plot(here('figs', 'lc2017_plot.png'), lc2017_plot, ncol = 4, nrow = 4, base_height = 2)
+  theme(legend.position = "none") +
+  labs(x = "Mean % leaf damage",
+       y = "Concentration (µg/mg)")
+lc_plot.2017
 ```
 
-#### plot using plot_grid()
-
-Making a list of plots and then using `plot_grid()`.  Pros: easier to annotate with p-values.  Cons: don't know how to do axis labels better, don't know how to remove lines from certain plots.
-
 ```{r}
-#Augment results with predicted values for drawing curves/lines
-results2 <-
-  results2 %>%
-  mutate(pred = map2(model, data, ~{
-    ndf <- tibble(mean_percent_damage = seq(min(.y$mean_percent_damage),
-                                            max(.y$mean_percent_damage),
-                                            length.out = 50))
-    augment(.x, newdata = ndf)
-    }))
-
-# map a plotting function to every compound
-plotlist <-
-  pmap(list(.x = results2$data, .y = results2$pred, .name = results2$compound, .p = results2$p.value), 
-     function(.x, .y, .name, .p) {
-       ggplot(.x, aes(x = mean_percent_damage, y = conc_ug_mg)) +
-         geom_point() +
-         geom_line(aes(x = mean_percent_damage, y = .fitted), data = .y) +
-         labs(
-           x = "Mean % damaged leaf area",
-           y = "Concentration (µg/mg)",
-           subtitle = .name,
-           caption = glue("p = {round(.p, 4)}")) +
-         theme_bw() #+
-         # theme(axis.title = element_blank())
-     })
-
-# plot_grid(plotlist = plotlist) %>%
-  # save_plot(here('figs', 'lc2017_plot2.png'), ., ncol = 4, nrow = 4, base_height = 2)
+save_plot(here("figs", "lc_biomarker_plot_2017.png"), lc_plot.2017,
+          ncol = 2,
+          nrow = 2,
+          base_height = 2,
+          base_asp = 1.3)
 ```
 
 # 2018
 
-## RDA
-Probably RDA is better since there are some correlations?
 
-1. Fit RDA model
+## Checking effect of processing time
+In this year, I was unable to keep samples refridgerated as I processed them (scanning, then microwaving, then drying).  Scanning was the bottleneck step, so the first samples spent a lot less time sitting out on the counter after being harvested than the last samples.  To check for an effect of sample order, I pulled the file creation times from all the scanned images and merged them with the data.  Then, I used the time the scan was created as a conditional variable in an RDA.  It only explained about 1% of the variation in the LCMS compounds, so I won't use it as a covariate going forward.
 
-Added plant_num (i.e. sample processing order) as a conditional variable.  This pulls the variation from sample order out before doing the RDA---kind of like a random variable, but still a fixed variable, strictly speaking. I did this because samples were not refrigerated while I was processing them and the scanning was the bottleneck step, so samples later on were sitting on the counter longer.
-```{r}
+```{r eval=FALSE}
 jgy_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Jin Guan Yin"
 lj_path <- "/Volumes/as_rsch_orianslab_tea01$/Image Analysis/2018/Leaf Scans/Manipulative/Longjing"
 
 jgy_info <-
   dir(jgy_path, "*.jpg", full.names = TRUE) %>%
   file.info() %>% 
-  as.tibble(rownames = "paths") %>% 
+  as_tibble(rownames = "paths") %>% 
   mutate(plant_num = str_extract(paths, "\\d+(?=\\w?\\.jpg$)")) %>% 
   mutate(sample = paste0("J", plant_num)) %>% 
   mutate(mtime = if_else(sample == "J18",
@@ -329,7 +239,7 @@ jgy_info <-
 lj_info <-
   dir(lj_path, "*.png", full.names = TRUE) %>% 
   file.info() %>% 
-  as.tibble(rownames = "paths") %>% 
+  as_tibble(rownames = "paths") %>% 
   mutate(plant_num = str_extract(paths, "\\d+(?=\\w?\\.png$)")) %>% 
   mutate(sample = paste0("L", plant_num)) %>% 
   mutate(time = mtime - min(mtime))
@@ -339,11 +249,9 @@ processing_time <-
   select(sample, plant_num, time) %>% 
   group_by(sample) %>% 
   summarize(time = min(time))
-
-
 ```
 
-```{r}
+```{r eval=FALSE}
 lc2018_scaled <- 
   lc2018_2 %>% 
   mutate_at(vars(Caffeine:Theobromine), scale) %>% 
@@ -355,15 +263,32 @@ rda.2018 <-
       data = lc2018_scaled)
 ```
 
+```{r eval=FALSE}
+MVA.synt(rda.2018)
+```
+
+## RDA using leaf damage
+
+1. Fit RDA model
+
+```{r}
+lc2018_scaled <- 
+  lc2018_2 %>% 
+  mutate_at(vars(Caffeine:Theobromine), scale) %>% 
+  mutate(cultivar = as.factor(cultivar))
+
+rda.2018 <- 
+  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar,
+      data = lc2018_scaled)
+```
+
 2. How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda.2018)
 ```
 
-Looks like sample order doesn't matter. Only 1.86% of variation.
-
-31.63% of variation explained by cultivar and leaf damage!
+Experimental design explains 32.36% of variation in LCMS compounds
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -384,7 +309,8 @@ Significant effect of cultivar, no effect of damage.
 5. Loadings
 
 ```{r}
-rda.2018$CCA$v %>% 
+loads2018 <-
+  rda.2018$CCA$v %>% 
   as_tibble(rownames = "compound") %>% 
   arrange(desc(abs(RDA1)))
 
@@ -394,6 +320,53 @@ MVA.plot(rda.2018,
          drawextaxes = FALSE,
          main = "LCMS compounds",
          main.pos = "topleft")
+
+ts2018 <-
+  lc2018_tidy %>% 
+  group_by(compound) %>%
+  nest() %>% 
+  mutate(ttest = map(data, ~t.test(conc_ug_mg~cultivar, .x)%>% tidy())) %>% 
+  unnest(ttest) %>% 
+  select(compound, d = estimate, J_conc = estimate1, L_conc = estimate2, p.value) %>% 
+  mutate(p.adj = p.adjust(p.value, "fdr"))
+
+full_join(loads2018, ts2018) %>% arrange(desc(abs(RDA1)))
+
+lc2018_tidy %>% filter(compound == "Theobromine") %>% t.test(conc_ug_mg~cultivar, .)
 ```
 
 Cultivar differences mainly in Theobromine, Gallocatechin, Epigallocatechin and Caffeine with all of them lower in Jin Guan Yin
+
+
+## RDA using leafhopper density
+
+1. Fit RDA model
+
+```{r}
+rda.2018.dens <- 
+  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ density_end*cultivar,
+      data = lc2018_scaled)
+```
+
+2. How much total variance does the experimental design explain?
+
+```{r}
+MVA.synt(rda.2018.dens)
+```
+
+
+3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(rda.2018.dens)
+```
+
+Highly significant global effect
+
+4. Then we test for significance of individual factors and interaction terms:
+
+```{r}
+MVA.anova(rda.2018.dens)
+```
+
+Significant effect of cultivar, no effect of density
