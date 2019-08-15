@@ -160,7 +160,7 @@ dens.2017.plot
 dam.poly.17 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2017)
 dam.linear.17 <- lm(mg_g_gae ~ mean_percent_damage, data = tp2017)
 dam.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
-AIC(dam.poly.17, dam.linear.17, dam.null.17)
+bbmle::AICtab(dam.poly.17, dam.linear.17, dam.null.17)
 Anova(dam.poly.17)
 ```
 Now, the polynomial model is the best and there is a marginally significant relationship with  % damage (p = `r round(Anova(dam.poly.17)[["Pr(>F)"]][1],3)`)
@@ -182,6 +182,7 @@ dam.2017.plot
 
 
 # 2018
+
 
 ## Regression with leafhopper density as predictor
 
@@ -235,23 +236,41 @@ dens_dam_2018 <-
   theme_bw()
 ```
 
+## Split cultivars
+I've decided it's gonna be best to just analyze the two cultivars separately for everything
+```{r}
+tp_jgy <- tp2018 %>% filter(str_detect(sample, "J"))
+tp_lj <- tp2018 %>% filter(str_detect(sample, "L"))
+```
+
 ## Polyphenols vs. density
 
 I'll test for a quadratic or linear relationship
 
+### Jin Guan Yin
 ```{r}
-dens.poly.cv.18 <- lm(mg_g_gae ~ poly(density_end, 2)*cultivar, data = tp2018)
-dens.poly.18 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2018)
-dens.linear.cv.18 <- lm(mg_g_gae ~ density_end*cultivar, data = tp2018)
-dens.linear.18 <- lm(mg_g_gae ~ density_end, data = tp2018)
-dens.cv.18 <- lm(mg_g_gae ~ cultivar, data = tp2018)
-dens.null.18 <- lm(mg_g_gae ~ 1, data = tp2018)
-bbmle::AICtab(dens.poly.cv.18, dens.poly.18, dens.linear.cv.18, dens.linear.18, dens.cv.18, dens.null.18)
-# lmtest::lrtest(dens.linear.cv.18)
-# Anova(dens.cv.18)
+dens.jgy.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_jgy)
+dens.jgy.lm <- lm(mg_g_gae ~ density_end, data = tp_jgy)
+dens.jgy.null <- lm(mg_g_gae ~ 1, data = tp_jgy)
+bbmle::AICtab(dens.jgy.poly, dens.jgy.lm, dens.jgy.null)
 ```
 
-The null model wins. No effect of cultivar or leafhopper density on total polyphenols.
+The null model wins. No effect of leafhopper density on total polyphenols for JGY
+
+### Long Jing
+
+```{r}
+dens.lj.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_lj)
+dens.lj.lm <- lm(mg_g_gae ~ density_end, data = tp_lj)
+dens.lj.null <- lm(mg_g_gae ~ 1, data = tp_lj)
+bbmle::AICtab(dens.lj.poly, dens.lj.lm, dens.lj.null)
+# car::Anova(dens.lj.lm)
+```
+
+The null model wins. No effect of leafhopper density on total polyphenols for JGY
+
+
+
 ```{r}
 dens.2018.plot <-
   ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = cultivar)) +
@@ -265,17 +284,21 @@ dens.2018.plot
 ```
 
 ## Polyphenols vs. damage
-
+### Jin Guan Yin
 ```{r}
-dam.poly.cv.18 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2) * cultivar, data = tp2018)
-dam.poly.18 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2018)
-dam.linear.cv.18 <- lm(mg_g_gae ~ mean_percent_damage * cultivar, data = tp2018)
-dam.linear.18 <- lm(mg_g_gae ~ mean_percent_damage, data = tp2018)
-dam.cv.18 <- lm(mg_g_gae ~ cultivar, data = tp2018)
-dam.null.18 <- lm(mg_g_gae ~ 1, data = tp2018)
-bbmle::AICtab(dam.poly.cv.18, dam.poly.18, dam.linear.cv.18, dam.linear.18, dam.cv.18, dam.null.18)
+dam.jgy.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_jgy)
+dam.jgy.lm <- lm(mg_g_gae ~ mean_percent_damage, data = tp_jgy)
+dam.jgy.null <- lm(mg_g_gae ~ 1, data = tp_jgy)
+bbmle::AICtab(dam.jgy.poly, dam.jgy.lm, dam.jgy.null)
+```
+Null model wins
 
-# Anova(dam.cv.18)
+### Long Jing
+```{r}
+dam.lj.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_lj)
+dam.lj.lm <- lm(mg_g_gae ~ mean_percent_damage, data = tp_lj)
+dam.lj.null <- lm(mg_g_gae ~ 1, data = tp_lj)
+bbmle::AICtab(dam.lj.poly, dam.lj.lm, dam.lj.null)
 ```
 
 The winning model is the null model
