@@ -22,6 +22,7 @@ knitr::opts_chunk$set(
 library(tidyverse) #for data manipulation
 library(here)
 library(chemhelper)
+library(webchem)
 
 #for outlier detection:
 library(MVN)
@@ -90,6 +91,25 @@ alkanes <-
 alkanes
 ```
 
+## Method file with CAS numbers
+
+```{r}
+method <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Fujian 2017 Manipulative/Methods/Fujian Manipulative Adjusted 2/Fujian Manipulative Adjusted2 Compound References.csv")
+```
+
+Merge with data
+
+```{r}
+CASs <-
+  method %>%
+  select(No., Compound, CAS) %>% 
+  mutate(CAS = as.cas(CAS)) %>% 
+  #try to catch all the unknowns
+  mutate(CAS = ifelse(str_detect(Compound, "^\\d+$") | str_detect(Compound, "DCSE"), NA, CAS))
+gc_tidy <-
+  left_join(gc_tidy, CASs) %>% select(filename, No., Type, Compound, CAS, everything())
+```
+
 ## Extract sample name from filename, set cultivar
 
 ```{r}
@@ -99,7 +119,6 @@ gc_tidy <-
          plant_num = str_extract(filename, "(?<=Hop_)\\d+(?=_)"), #blanks will be NA
          sample = ifelse(!is.na(plant_num), paste0(cultivar, plant_num), filename)) %>% 
   select(filename, cultivar, plant_num, sample, everything())
-  
 ```
 
 
@@ -243,7 +262,7 @@ gc_tidy.7 <-
                              Censor       ~ FALSE,
                              RPA <= 500/IS ~ FALSE,
                              TRUE         ~ TRUE)) %>%
-  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, ri, present)
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, rt, ri, present)
 
 #How many compounds detected in each sample?
 gc_tidy.7 %>%
@@ -284,13 +303,13 @@ gc_zeroes.final %>% ungroup() %>% count(sample) #just checking that it's the sam
 gc_wide <- 
   gc_tidy.final %>%
   ungroup() %>% 
-  select(-rt, -ri, -No., -present) %>%
+  select(-rt, -ri, -No., -present, -CAS) %>%
   spread(key = Compound, value = RPA)
 
 gc_wide.zeroes <-
   gc_zeroes.final %>% 
   ungroup %>% 
-  select(-rt, -ri, -No., -present) %>% 
+  select(-rt, -ri, -No., -present, -CAS) %>% 
   spread(key = Compound, value = RPA)
 ```
 
@@ -314,7 +333,7 @@ metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percen
 test <-
   gc_tidy.final %>%
   ungroup() %>% 
-  select(-rt, -ri, -No., -present) %>% 
+  select(-rt, -ri, -No., -present, -CAS) %>% 
   spread(key = Compound, value = RPA) %>% 
   select(-metavars) %>%
   # mutate_all(~.*1000) %>%
@@ -354,11 +373,11 @@ pca.2 <-
   mutate_all(log) %>%
   opls(scaleC = "standard", plotL = FALSE)
 
-# plot(pca.2, parLabVc = gc_wide$sample)
-plot(pca.1, parLabVc = gc_wide$sample) #log transformed
+plot(pca.2, parLabVc = gc_wide$sample)#log transformed
+# plot(pca.1, parLabVc = gc_wide$sample) 
 ```
 
-Q8 shows up as an outlier in log-transformed data.
+Q8 and Q13 shows up as an outlier in untransformed data.
 
 I'm not going to remove this outlier.  I'm not convinved it's important to remove.
 

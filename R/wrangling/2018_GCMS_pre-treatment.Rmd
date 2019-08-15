@@ -98,6 +98,30 @@ alkanes_jgy <-
   add_column(C_num = 6:24)
 ```
 
+## Method file with CAS numbers
+Even though there are technically two methods, they have the same compounds, so I should be able to get what I need from just one
+
+```{r}
+method <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics Projects/Shengzhou_2018/Methods/Shengzhou_adj_JGY/Shengzhou_adj Compound References.csv")
+```
+
+Merge with data
+
+```{r}
+CASs <-
+  method %>%
+  select(Compound, CAS) %>% 
+  mutate(CAS = str_remove_all(CAS, "-")) %>% 
+  mutate(CAS = as.cas(CAS)) %>% 
+  #try to catch all the unknowns
+  mutate(CAS = ifelse(str_detect(Compound, "^\\d+$") | str_detect(Compound, "DCSE"), NA, CAS))
+CASs %>% filter(Compound == "1,4-Pentadiene")
+
+gc_tidy <-
+  left_join(gc_tidy, CASs) %>% select(filename, No., Type, Compound, CAS, everything())
+```
+
+
 ## Extract cultivar and sample name from filename
 I think jinguanyin blank20 is actually not a blank
 
@@ -236,8 +260,6 @@ gc_tidy.6 <-
                         cultivar == "L" ~ calc_RI(rt, alkanes_lj$rt, alkanes_lj$C_num)))
 ```
 
-# Add CAS numbers
-TODO
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
@@ -257,7 +279,7 @@ gc_tidy.7 <-
                              Censor  ~ FALSE,
                              RPA <=0 ~ FALSE,
                              TRUE    ~ TRUE)) %>%
-  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, RPA, rt, ri, present)
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, rt, ri, present)
 
 #How many compounds detected in each sample?
 gc_tidy.7 %>%
@@ -298,13 +320,13 @@ Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.
 ```{r}
 gc_wide <- 
   gc_tidy.final %>%
-  select(-rt, -ri, -No., -present) %>%
+  select(-rt, -ri, -No., -present, -CAS) %>%
   spread(key = Compound, value = RPA)
 
 gc_wide.zeroes <-
   gc_zeroes.final %>% 
   ungroup %>% 
-  select(-rt, -ri, -No., -present) %>% 
+  select(-rt, -ri, -No., -present, -CAS) %>% 
   spread(key = Compound, value = RPA)
 ```
 
@@ -330,7 +352,7 @@ metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percen
 test <-
   gc_tidy.final %>%
   ungroup() %>% 
-  select(-rt, -ri, -No., -present) %>% 
+  select(-rt, -ri, -No., -present, -CAS) %>% 
   spread(key = Compound, value = RPA) %>% 
   select(-metavars) %>%
   # mutate_all(~.*1000) %>%
