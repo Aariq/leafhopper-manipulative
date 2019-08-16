@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
 library(webchem)
+library(readxl)
 ```
 
 # Purpose
@@ -43,7 +44,7 @@ df <- full_join(compounds2017, compounds2018)
 ```
 # Get better names
 pc_synonyms doesn't take CAS numbers directly.
-```{r}
+```{r eval=FALSE}
 df2 <-
   df %>% 
   mutate(inchikey = ifelse(is.na(CAS), NA, cts_convert(CAS, from = "CAS", to = "InChIKey", choices = 1)))
@@ -57,7 +58,66 @@ write_excel_csv(df3, here("data", "raw", "compound CAS and names.csv"))
 
 You should compare this with names you used from the BACE paper before doing a ton of editing by hand.
 
-TODO:
 
-- get pretty names for all compounds
-- make a column for latex formatted version
+# Merge with BACE data
+
+```{r}
+bacedf <- read_excel(here("data", "raw", "Compound annotation.xlsx"))
+newdf <- read_csv(here("data", "raw", "compound CAS and names.csv"))
+fulldf <-
+  left_join(newdf, bacedf) %>% 
+  mutate(flavornet = ifelse(is.na(flavornet) & !is.na(CAS), fn_percept(CAS), flavornet))
+cass <- fulldf %>% 
+  filter(!is.na(CAS), is.na(`RI Lit`)) %>% pull(CAS)
+
+missing_lit_ri <- nist_ri(cass, type = "linear", polarity = "non-polar", temp_prog = "ramp")
+
+nearest <- function(x, y){
+  dist <- abs(x - y)
+  return(y[dist == min(dist)])
+}
+
+new_lit_ris <-
+  missing_lit_ri %>% 
+  filter(thickness == 0.25,
+         length == 30,
+         gas == "Helium",
+         str_detect(phase, "5MS")) %>% 
+  group_by(CAS) %>% 
+  filter(RI == nearest(mean(RI), RI)) %>% #only use the RI closest to the mean of all the reported lit RIs
+  summarize(RI = first(RI)) %>% #if that's more than one reference, just pick the first one
+  select(CAS, RI)
+
+fulldf2 <-
+  left_join(fulldf, new_lit_ris) %>% 
+  mutate(Source = ifelse(is.na(`RI Lit`) & !is.na(RI), "NIST", Source)) %>% 
+  mutate(`RI Lit` = ifelse(is.na(`RI Lit`), RI, `RI Lit`)) %>% 
+  select(-RI)
+
+#try again using normal alkane
+
+cass2 <- fulldf2 %>% filter(is.na(`RI Lit`) & !is.na(CAS)) %>% pull(CAS)
+
+missing_lit_ri2 <- nist_ri(cass2, type = "alkane", polarity = "non-polar", temp_prog = "ramp")
+
+new_lit_ris2 <- missing_lit_ri2 %>% 
+  filter(thickness == 0.25,
+         length == 30,
+         gas == "Helium",
+         str_detect(phase, "5MS")) %>% 
+  group_by(CAS) %>% 
+  summarize(RI = first(RI))
+
+fulldf3 <-
+  left_join(fulldf2, new_lit_ris2) %>% 
+  mutate(Source = ifelse(is.na(`RI Lit`) & !is.na(RI), "NIST", Source)) %>% 
+  mutate(`RI Lit` = ifelse(is.na(`RI Lit`), RI, `RI Lit`)) %>% 
+  select(-RI)
+
+```
+
+```{r}
+write_excel_csv(fulldf3, here("data", "cleaned", "Compound annotation updated.csv"))
+```
+
+Ok, manual editing after this
