@@ -90,7 +90,41 @@ ggplot(gc_wide.logscale, aes(log(mean_percent_damage)))+ geom_histogram(bins = 1
 ```
 I might want to log-transofrm the percent damage data.
 
+
+
 # Analysis
+# Descriptive statistics
+1. How many compounds?
+```{r}
+gc_tidy %>% group_by(sample) %>% tally()
+```
+2. How many in Long Jing, how many in JGY?
+```{r}
+gc_tidy %>%
+  filter(cultivar == "J") %>% 
+  group_by(Compound) %>% #for each compound...
+  filter(sum(present) > 0) %>% group_by(sample) %>% tally()
+
+gc_tidy %>% 
+  filter(cultivar == "L") %>% 
+  group_by(Compound) %>% 
+  filter(sum(present) > 0) %>%
+  group_by(sample) %>% tally()
+```
+
+3. How many found in **all** JGY or **all** LJ samples?
+```{r}
+gc_tidy %>% 
+  filter(cultivar == "J") %>% #count() #22 samples total
+  summarize(nsamp = sum(present)) %>% 
+  filter(nsamp == 22)
+
+gc_tidy %>% 
+  filter(cultivar == "L") %>% #count() #19 samples total
+  summarize(nsamp = sum(present)) %>% 
+  filter(nsamp == 19)
+```
+
 
 ## RDA for density
 1. Fit RDA model
@@ -159,33 +193,52 @@ MVA.anova(rda_cultivar)
 ```
 
 ```{r}
-scores <- MVA.scores(rda_cultivar)$coord
 loads <- MVA.load(rda_cultivar)$loads %>% rename(loading = `Constr. comp. 1`)
 
 MVA.plot(rda_cultivar, fac = gc_wide.logscale$cultivar)
 
-
-df <- map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
-  bind_cols(loads) %>%
-  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
-  filter(p.adj < 0.05) %>%
-  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
-  arrange(desc(abs(loading)))
-df %>% mutate(pos = loading > 0, neg = loading <=0) %>% 
-  count(neg)
 ```
 
 positive loading means greater concentration in J. negative loading means greater concentration in L.
 
 # Splitting by cultivar
 
-I don't really believe that ALL compounds were in higher concentration in one cultivar.  Seems like differences in sampling/running on GCMS.  Let's split the cultivars and run separate RDAs
+I don't really believe that ALL compounds were in higher concentration in one cultivar.  Seems like differences in sampling/running on GCMS.  Let's split the cultivars and run separate RDAs.
+
+I need to split them *before* scaling!
 
 ```{r}
-gc_jgy <- gc_wide.logscale %>% 
-  filter(cultivar == "J")
-gc_lj <- gc_wide.logscale %>% 
-  filter(cultivar == "L")
+gc_jgy <-   
+  gc_wide %>% 
+  filter(cultivar == "J") %>% 
+  mutate_at(vars(-metavars), log) %>%
+  mutate_at(vars(-metavars), scale) %>% 
+  #strip atrributes left by scale() that interfere with some other functions down the road
+  mutate_at(vars(-metavars), rm_attr)
+gc_jgy.t <-   
+  gc_wide %>% 
+  filter(cultivar == "J") %>% 
+  filter(!is.na(twister_damage)) %>% 
+  mutate_at(vars(-metavars), log) %>%
+  mutate_at(vars(-metavars), scale) %>% 
+  #strip atrributes left by scale() that interfere with some other functions down the road
+  mutate_at(vars(-metavars), rm_attr)
+gc_lj <- 
+  gc_wide %>% 
+  filter(cultivar == "L") %>% 
+  mutate_at(vars(-metavars), log) %>%
+  mutate_at(vars(-metavars), scale) %>% 
+  #strip atrributes left by scale() that interfere with some other functions down the road
+  mutate_at(vars(-metavars), rm_attr)
+
+gc_lj.t <- 
+  gc_wide %>% 
+  filter(cultivar == "L") %>% 
+  filter(!is.na(twister_damage)) %>%
+  mutate_at(vars(-metavars), log) %>%
+  mutate_at(vars(-metavars), scale) %>% 
+  #strip atrributes left by scale() that interfere with some other functions down the road
+  mutate_at(vars(-metavars), rm_attr)
 ```
 
 ```{r}
@@ -200,8 +253,8 @@ rda_jgy_dam <-
 anova(rda_jgy_dam)
 
 rda_jgy_t <- 
-  rda(gc_jgy %>% filter(!is.na(twister_damage)) %>% select(-metavars) ~ twister_damage,
-      data = gc_jgy %>% filter(!is.na(twister_damage)))
+  rda(gc_jgy.t %>% select(-metavars) ~ twister_damage,
+      data = gc_jgy.t)
 anova(rda_jgy_t)
 ```
 
@@ -216,15 +269,10 @@ rda_lj_dam <-
       data = gc_lj)
 anova(rda_lj_dam)
 
-gc_lj.t <- gc_lj %>% filter(!is.na(twister_damage))
 rda_lj_t <-
   rda(gc_lj.t %>% select(-metavars) ~ mean_percent_damage,
       data = gc_lj.t)
 anova(rda_lj_t)
-```
-
-```{r}
-rda_lj_dam$CCA$v %>% as_tibble(rownames = "compound") %>% arrange(desc(abs(RDA1)))
 ```
 
 

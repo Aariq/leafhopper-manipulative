@@ -96,6 +96,35 @@ ggplot(gc_wide.logscale, aes(log(mean_percent_damage))) + geom_histogram(bins = 
 
 # Analysis
 
+## Descriptive statistics
+1. how many compounds total?
+94
+```{r}
+gc_tidy %>% group_by(sample) %>% tally()
+```
+
+2. how many compounds are found in all samples?
+Only 4
+```{r}
+gc_tidy %>% 
+  group_by(Compound) %>% 
+  summarize(nsample = sum(present)) %>% 
+  filter(nsample > 15)
+```
+
+
+## PLS for density
+
+```{r}
+library(ropls)
+library(chemhelper)
+```
+```{r}
+pls_dens <- opls(gc_wide.logscale %>% select(-metavars), gc_wide.logscale$density_end,
+                 plotL = FALSE)
+get_VIP(pls_dens) %>% arrange(desc(VIP))
+```
+
 
 ## RDA for density
 1. Fit RDA model
@@ -146,7 +175,6 @@ I need to extract loadings, then figure out which compounds are signifcantly cor
 
 ```{r}
 # MVA.scores(dbrda_dens)
-
 scores <- MVA.scores(rda_dens)$coord
 loads <- MVA.load(rda_dens)$loads %>% rename(loading = `Constr. comp. 1`)
 
@@ -185,6 +213,15 @@ save_plot(here("figs", "density-biomarkers.png"), dens_plot,
           base_height = 2,
           base_asp = 1.3)
 ```
+
+## PLS for damage
+```{r}
+pls_dam <- opls(gc_wide.logscale %>% select(-metavars), gc_wide.logscale$twister_damage,
+                plotL = FALSE)
+get_VIP(pls_dam) %>% arrange(desc(VIP))
+```
+
+I think I actually like RDA better because it tells you explicitly how much variation the experimental design accounts for.  Gives an idea of how much background variation there is.  Good discussion points.
 
 ## RDA for damage
 1. Fit RDA
