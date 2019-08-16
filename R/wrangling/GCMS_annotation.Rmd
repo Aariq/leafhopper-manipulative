@@ -113,7 +113,7 @@ fulldf3 <-
   mutate(Source = ifelse(is.na(`RI Lit`) & !is.na(RI), "NIST", Source)) %>% 
   mutate(`RI Lit` = ifelse(is.na(`RI Lit`), RI, `RI Lit`)) %>% 
   select(-RI)
-
+fulldf3 %>% filter(str_detect(Compound, "tau"))
 ```
 
 ```{r}
@@ -121,3 +121,9 @@ write_excel_csv(fulldf3, here("data", "cleaned", "Compound annotation updated.cs
 ```
 
 Ok, manual editing after this
+
+$(E)$-$\beta$-Ocimene
+
+$$
+p = \mathit{p}
+$$
