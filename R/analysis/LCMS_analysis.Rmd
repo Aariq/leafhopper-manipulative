@@ -267,98 +267,78 @@ rda.2018 <-
 MVA.synt(rda.2018)
 ```
 
-## RDA using leaf damage
+## Split cultivars
 
-1. Fit RDA model
+It doesn't make sense to include both cultivars in the analysis.
 
 ```{r}
-lc2018_scaled <- 
+lc_jgy <- 
   lc2018_2 %>% 
-  mutate_at(vars(Caffeine:Theobromine), scale) %>% 
-  mutate(cultivar = as.factor(cultivar))
+  filter(cultivar == "J") %>% 
+  mutate_at(vars(Caffeine:Theobromine), scale)
+lc_lj <-
+  lc2018_2 %>% 
+  filter(cultivar == "L") %>% 
+  mutate_at(vars(Caffeine:Theobromine), scale)
+```
 
-rda.2018 <- 
-  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar,
-      data = lc2018_scaled)
+
+## Jin Guan Yin
+
+1. Fit RDA models
+
+```{r}
+rda_dens_jgy <- 
+  rda(lc_jgy %>% select(Caffeine:Theobromine) ~ density_end,
+      data = lc_jgy)
+
+rda_dam_jgy <- 
+  rda(lc_jgy %>% select(Caffeine:Theobromine) ~ mean_percent_damage,
+      data = lc_jgy)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda.2018)
+MVA.synt(rda_dens_jgy)
+MVA.synt(rda_dam_jgy)
 ```
 
-Experimental design explains 32.36% of variation in LCMS compounds
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
-anova(rda.2018)
+anova(rda_dens_jgy)
+anova(rda_dam_jgy)
 ```
 
-Highly significant global effect
-
-4. Then we test for significance of individual factors and interaction terms:
-
-```{r}
-MVA.anova(rda.2018)
-```
-
-Significant effect of cultivar, no effect of damage.
-
-5. Loadings
-
-```{r}
-loads2018 <-
-  rda.2018$CCA$v %>% 
-  as_tibble(rownames = "compound") %>% 
-  arrange(desc(abs(RDA1)))
-
-
-MVA.plot(rda.2018, 
-         fac = lc2018_scaled$cultivar,
-         drawextaxes = FALSE,
-         main = "LCMS compounds",
-         main.pos = "topleft")
-
-ts2018 <-
-  lc2018_tidy %>% 
-  group_by(compound) %>%
-  nest() %>% 
-  mutate(ttest = map(data, ~t.test(conc_ug_mg~cultivar, .x)%>% tidy())) %>% 
-  unnest(ttest) %>% 
-  select(compound, d = estimate, J_conc = estimate1, L_conc = estimate2, p.value) %>% 
-  mutate(p.adj = p.adjust(p.value, "fdr"))
-
-full_join(loads2018, ts2018) %>% arrange(desc(abs(RDA1)))
-
-lc2018_tidy %>% filter(compound == "Theobromine") %>% t.test(conc_ug_mg~cultivar, .)
-```
-
-Cultivar differences mainly in Theobromine, Gallocatechin, Epigallocatechin and Caffeine with all of them lower in Jin Guan Yin
-
-
-## RDA using leafhopper density
+## Long Jing
 
 1. Fit RDA model
 
 ```{r}
-rda.2018.dens <- 
-  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ density_end*cultivar,
-      data = lc2018_scaled)
+rda_dens_lj <- 
+  rda(lc_lj %>% select(Caffeine:Theobromine) ~ density_end,
+      data = lc_lj)
+
+rda_dam_lj <- 
+  rda(lc_lj %>% select(Caffeine:Theobromine) ~ mean_percent_damage,
+      data = lc_lj)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda.2018.dens)
+MVA.synt(rda_dens_lj)
+MVA.synt(rda_dam_lj)
 ```
 
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
-anova(rda.2018.dens)
+anova(rda_dens_lj)
+anova(rda_dam_lj)
 ```
 
 Highly significant global effect
