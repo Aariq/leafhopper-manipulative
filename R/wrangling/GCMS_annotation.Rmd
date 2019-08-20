@@ -127,3 +127,9 @@ $(E)$-$\beta$-Ocimene
 $$
 p = \mathit{p}
 $$
+```{r}
+gc2018 %>% filter(Compound == "1-Hexanol", sample == "J21")
+gc2018 %>% filter(Compound == "1-Hexanol", sample == "J7")
+
+```
+

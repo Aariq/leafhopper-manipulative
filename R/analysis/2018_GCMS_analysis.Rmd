@@ -247,7 +247,7 @@ rda_jgy_dens <-
       data = gc_jgy)
 anova(rda_jgy_dens)
 
-rda_jgy_dam <- 
+rda_jgy_dam <-
   rda(gc_jgy %>% select(-metavars) ~ mean_percent_damage,
       data = gc_jgy)
 anova(rda_jgy_dam)
@@ -275,57 +275,4 @@ rda_lj_t <-
 anova(rda_lj_t)
 ```
 
-
-#PLSR
-
-```{r}
-library(ropls)
-```
-
-```{r}
-pls_lj_dens <-
-  opls(gc_lj %>% select(-metavars), gc_lj$density_end,
-       scale = "none",
-       permI = 500,
-       plotL = FALSE)
-
-pls_lj_dam <-
-  opls(gc_lj %>% select(-metavars), gc_lj$mean_percent_damage,
-       scale = "none",
-       permI = 500,
-       plotL = FALSE)
-
-gc_lj.t <- gc_lj %>% filter(!is.na(twister_damage))
-
-pls_lj_t <-
-  opls(gc_lj.t %>% select(-metavars), gc_lj.t$twister_damage,
-       scale = "none",
-       permI = 500,
-       plotL = FALSE)
-
-get_VIP(pls_lj_dam) %>% arrange(desc(VIP))  
-```
-```{r}
-pls_jgy_dens <-
-  opls(gc_jgy %>% select(-metavars), gc_jgy$density_end,
-       scale = "none",
-       permI = 500,
-       predI = 1,
-       plotL = FALSE)
-
-pls_jgy_dam <-
-  opls(gc_jgy %>% select(-metavars), gc_jgy$mean_percent_damage,
-       scale = "none",
-       permI = 500,
-       predI = 1,
-       plotL = FALSE)
-
-gc_jgy.t <- gc_jgy %>% filter(!is.na(twister_damage))
-pls_jgy_dam <-
-  opls(gc_jgy.t %>% select(-metavars), gc_jgy.t$twister_damage,
-       scale = "none",
-       permI = 500,
-       predI = 1,
-       plotL = FALSE)
-```
 
