@@ -332,6 +332,7 @@ lowQs <-
   pull(Compound)
 
 gc_tidy.final <- gc_tidy.final %>% filter(!Compound %in% lowQs)
+gc_zeroes.final <- gc_zeroes.final %>% filter(!Compound %in% lowQs)
 ```
 
 # Create wide dataframe for multivariate analysis
