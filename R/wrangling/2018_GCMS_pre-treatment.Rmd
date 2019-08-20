@@ -21,6 +21,7 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(chemhelper)
 library(here)
+library(webchem)
 
 #for outlier detection:
 library(MVN)
@@ -115,7 +116,7 @@ CASs <-
   mutate(CAS = as.cas(CAS)) %>% 
   #try to catch all the unknowns
   mutate(CAS = ifelse(str_detect(Compound, "^\\d+$") | str_detect(Compound, "DCSE"), NA, CAS))
-CASs %>% filter(Compound == "1,4-Pentadiene")
+# CASs %>% filter(Compound == "1,4-Pentadiene")
 
 gc_tidy <-
   left_join(gc_tidy, CASs) %>% select(filename, No., Type, Compound, CAS, everything())
@@ -159,6 +160,7 @@ These chlorinated compounds are likely pesticides:
 
 - Benzaldehyde, 2,6-dichloro-
 - Benzene, chloro-
+
 
 ```{r}
 contaminants <- c("Propanoic acid, 2-methyl-, 1-(1,1-dimethylethyl)-2-methyl-1,3-propanediyl ester",
@@ -268,6 +270,8 @@ Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored
 I'll set all zeroes to 500/IS.  This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
 
 
+Also set Q-values of compounds not found to NA
+
 ```{r}
 gc_tidy.7 <-
   gc_tidy.6 %>%
@@ -279,7 +283,8 @@ gc_tidy.7 <-
                              Censor  ~ FALSE,
                              RPA <=0 ~ FALSE,
                              TRUE    ~ TRUE)) %>%
-  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, rt, ri, present)
+  mutate(QVal = ifelse(present, QVal, NA)) %>% 
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, QVal, rt, ri, present)
 
 #How many compounds detected in each sample?
 gc_tidy.7 %>%
@@ -313,6 +318,22 @@ gc_zeroes.final <-
 gc_zeroes.final %>% ungroup() %>% count(sample) #just checking that it's the same
 ```
 
+# Check for compounds with low average Q-value
+
+I really don't super trust the Q-value anymore, but I think I'll go ahead and filter out anything with a Q-value less than 90.
+
+```{r}
+lowQs <-
+  gc_tidy.final %>% 
+  group_by(Compound) %>% 
+  summarize(meanQ = mean(QVal, na.rm = TRUE)) %>% 
+  arrange(meanQ) %>% 
+  filter(meanQ <= 90) %>% 
+  pull(Compound)
+
+gc_tidy.final <- gc_tidy.final %>% filter(!Compound %in% lowQs)
+```
+
 # Create wide dataframe for multivariate analysis
 
 Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.0 with the `pivot_wider()` function, but I don't think its so important that I need to use a development version of a package.
@@ -320,13 +341,13 @@ Unfortunately changes column order to alphabetical.  This is fixed in `tidyr` 1.
 ```{r}
 gc_wide <- 
   gc_tidy.final %>%
-  select(-rt, -ri, -No., -present, -CAS) %>%
+  select(-rt, -ri, -No., -present, -CAS, -QVal) %>%
   spread(key = Compound, value = RPA)
 
 gc_wide.zeroes <-
   gc_zeroes.final %>% 
   ungroup %>% 
-  select(-rt, -ri, -No., -present, -CAS) %>% 
+  select(-rt, -ri, -No., -present, -CAS, -QVal) %>% 
   spread(key = Compound, value = RPA)
 ```
 
@@ -349,18 +370,19 @@ metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percen
 ```
  
 ```{r eval=FALSE}
-test <-
-  gc_tidy.final %>%
-  ungroup() %>% 
-  select(-rt, -ri, -No., -present, -CAS) %>% 
-  spread(key = Compound, value = RPA) %>% 
-  select(-metavars) %>%
-  # mutate_all(~.*1000) %>%
-  mvn(mvnTest = "mardia",
-      transform = "log",
-      multivariatePlot = "qq",
-      scale = TRUE)
-test
+# This code seems to hang.
+# test <-
+#   gc_tidy.final %>%
+#   ungroup() %>% 
+#   select(-rt, -ri, -No., -present, -CAS) %>% 
+#   spread(key = Compound, value = RPA) %>% 
+#   select(-metavars) %>%
+#   # mutate_all(~.*1000) %>%
+#   mvn(mvnTest = "mardia",
+#       transform = "log",
+#       multivariatePlot = "qq",
+#       scale = TRUE)
+# test
 ```
 
 ## Multivariate outlier detection
@@ -375,7 +397,7 @@ gc_wide[out, ]
 out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
 gc_wide[out2, ]
 ```
-No outliers detected
+L15 and L21 detected as outliers in log-transformed data only, and at alpha = 0.1, not alpha = 0.05
 
 ## With PCA
 
