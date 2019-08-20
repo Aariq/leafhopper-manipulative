@@ -99,7 +99,7 @@ method <- read_IA("/Volumes/as_rsch_orianslab_tea01$/IonAnalytics/IonAnalytics P
 
 Merge with data
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 CASs <-
   method %>%
   select(No., Compound, CAS) %>% 
@@ -125,7 +125,7 @@ gc_tidy <-
 
 # Tag non-detects and to-be-censored
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 gc_tidy <-
   gc_tidy %>%
   mutate(ND = area == 0,
@@ -244,8 +244,7 @@ gc_tidy.6 <-
   mutate(ri = calc_RI(rt, alkanes$rt, alkanes$C_num))
 ```
 
-# Add CAS numbers
-TODO
+
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
@@ -262,7 +261,8 @@ gc_tidy.7 <-
                              Censor       ~ FALSE,
                              RPA <= 500/IS ~ FALSE,
                              TRUE         ~ TRUE)) %>%
-  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, rt, ri, present)
+   mutate(QVal = ifelse(present, QVal, NA)) %>%
+  select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, QVal, rt, ri, present)  
 
 #How many compounds detected in each sample?
 gc_tidy.7 %>%
@@ -296,6 +296,16 @@ gc_zeroes.final <-
 gc_zeroes.final %>% ungroup() %>% count(sample) #just checking that it's the same
 ```
 0.001717365
+
+# Check for compounds with low average Q-values
+All compounds have mean Q-value > 90. 
+
+```{r}
+gc_tidy.final %>% 
+  group_by(Compound) %>% 
+  summarize(meanQ = mean(QVal, na.rm = TRUE)) %>% 
+  arrange(meanQ) %>% 
+```
 
 # Create wide data frame
 
