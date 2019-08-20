@@ -194,9 +194,12 @@ Top contributors: EGCG, Caffeine, Theobromine, ECG.  All negative relationship w
 ## Plots
 
 ```{r}
-lc_plotdata.2017 <- lc2017_tidy %>% filter(compound %in% pull(lc_biomarkers_2017, compound))
+lc_plotdata.2017 <-
+  left_join(lc_biomarkers_2017, lc2017_tidy) %>% 
+  mutate(compound = fct_reorder(compound, abs(loading), .desc = TRUE))
+  
 lc_plot.2017 <-
-  ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg, color = compound)) +
+  ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg)) +
   geom_point() +
   # geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~compound, scales = "free_y") +
