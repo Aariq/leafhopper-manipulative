@@ -1,0 +1,20 @@
+﻿Compound,CAS,RDA Loading,p,Aroma,Chemical Family,response
+"(E,E)-α-Farnesene",502-61-4,-0.271,0.002,"woody, sweet, green, floral",Sesquiterpene hydrocarbon,Density
+β-Myrcene,123-35-3,-0.244,0.005,"balsamic, must, spice",Monoterpene hydrocarbon,Density
+trans-α-Bergamotene,13474-59-4,-0.238,0.021,"woody, warm, tea",Monoterpene hydrocarbon,Density
+(E)-β-Ocimene,3379-61-1,-0.223,0.009,"citrus, green, terpene",Monoterpene hydrocarbon,Density
+Sulcatone,110-93-0,-0.21,0.002,"green, musty, pepper, mushroom, rubber",Aliphatic ketone,Density
+"cis-Butyric acid, 3-hexenyl ester",16491-36-4,-0.19,0.031,"wine, green",Fatty acid ester,Density
+"(E,E)-Allo-ocimene",3016-19-1,-0.184,0.024,"terpenic, sweet, fresh, floral",Monoterpene hydrocarbon,Density
+Indole,120-72-9,-0.157,0.021,"concentrated = fecal, animal; dilute = sweet, floral",Nitrogen containing,Density
+(Z)-β-Ocimene,3338-55-4,-0.155,0.039,"citrus, herbal, floral",Monoterpene hydrocarbon,Density
+Octanoic acid,124-07-2,0.143,0.041,"cheesy, fatty, waxy",Fatty acid,Density
+Heptanoic acid,111-14-8,0.135,0.039,"cheesy, sour, rancid",Fatty acid,Density
+Hexanoic acid,142-62-1,0.133,0.034,"cheesy, fatty",Fatty acid,Density
+trans-Dehydroxylinalool oxide,54750-70-8,-0.126,0.039,"herbal, green, terpene",Oxygenated monoterpene,Density
+(E)-2-Hexen-1-ol,928-95-0,0.23,0.003,"green, leaf, walnut",Alkenyl alcohol,Damage
+Phenethyl alcohol,60-12-8,0.212,0.026,"honey, spice, rose, lilac",Aromatic alcohol,Damage
+1-Hexanol,111-27-3,0.212,0.001,"resin, flower, green",Aliphatic alcohol,Damage
+Benzothiazole,95-16-9,0.195,0.02,"rubbery, sulfury, vegetal, gasoline",Nitrogen sulfur containing,Damage
+(3Z)-Hexenyl hexanoate,31501-11-8,0.181,0.026,"fruit, prune",Fatty acid ester,Damage
+"N,N-Dibutylformamide",761-65-9,0.168,0.02,-,Nitrogen containing,Damage
