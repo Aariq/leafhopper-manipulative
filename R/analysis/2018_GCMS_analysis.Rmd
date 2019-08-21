@@ -117,7 +117,7 @@ gc_tidy %>%
 gc_tidy %>% 
   filter(cultivar == "J") %>% #count() #22 samples total
   summarize(nsamp = sum(present)) %>% 
-  filter(nsamp == 22)
+  filter(nsamp == 20)
 
 gc_tidy %>% 
   filter(cultivar == "L") %>% #count() #19 samples total
