@@ -115,7 +115,10 @@ Only 4
 gc_tidy %>% 
   group_by(Compound) %>% 
   summarize(nsample = sum(present)) %>% 
-  filter(nsample > 15)
+  filter(nsample > 18) %>% 
+  rename(compound = Compound) %>%
+  left_join(annotations)
+
 ```
 
 
