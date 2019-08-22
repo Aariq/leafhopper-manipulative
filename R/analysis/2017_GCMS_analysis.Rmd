@@ -11,6 +11,7 @@ output:
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999) #turn off scientific notation
 ```
 
 *Last compiled: `r Sys.Date()`*
@@ -91,6 +92,10 @@ gc_wide.zeroes <-
   gc_wide.zeroes %>% 
   mutate_at(vars(-metavars), scale) %>% 
   mutate_at(vars(-metavars), rm_attr)
+
+#set up chemistry data for RDA
+chemdata <- gc_wide.logscale %>% select(-metavars) %>% as.data.frame()
+rownames(chemdata) <- gc_wide.logscale$sample
 ```
 
 I may also want to log-transform the percent leaf damage data, but I can do that ad-hoc later.
@@ -122,19 +127,6 @@ gc_tidy %>%
 ```
 
 
-## PLS for density
-
-```{r}
-library(ropls)
-library(chemhelper)
-```
-```{r}
-pls_dens <- opls(gc_wide.logscale %>% select(-metavars), gc_wide.logscale$density_end,
-                 plotL = FALSE)
-get_VIP(pls_dens) %>% arrange(desc(VIP))
-```
-
-
 ## RDA for density
 ### Fit RDA model
 
@@ -143,20 +135,13 @@ Only analysis for the regular RDA is shown, because the distance-based RDA gave 
 ```{r}
 #scaled, transformed
 rda_dens <-
-  rda(gc_wide.logscale %>% select(-metavars) ~ density_end,
-      data = gc_wide.logscale)
-
-#distance based on unscaled, untransformed data.
-dbrda_dens <-
-  dbrda(gc_wide.zeroes %>% select(-metavars) ~ density_end,
-      data = gc_wide.zeroes)
+  rda(chemdata ~ gc_wide.logscale$density_end)
 ```
 
 ### How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda_dens)
-# MVA.synt(dbrda_dens)
 ```
 
 yeesh, only 9.12% explained by ending density
@@ -167,70 +152,121 @@ yeesh, only 9.12% explained by ending density
 
 ```{r}
 anova(rda_dens)
-# anova(dbrda_dens)
 ```
 
 Significant effect of ending density on leaf volatiles
 
-4. Then we test for significance of individual factors and interaction terms:
-
-```{r}
-MVA.anova(rda_dens)
-# MVA.anova(dbrda_dens)
-```
 
 ### Loadings / Correlations
 
 I need to extract loadings, then figure out which compounds are signifcantly correlated with RDA axis, **not** with leafhopper density.  Should be correlation of scores with data.
 
 ```{r}
-# MVA.scores(dbrda_dens)
-scores <- MVA.scores(rda_dens)$coord
-loads <- MVA.load(rda_dens)$loads %>% rename(loading = `Constr. comp. 1`)
+dens_scores <-
+  scores(rda_dens, display = "sites", scaling = 0) %>% 
+  as_tibble(rownames = "sample")
 
-data <- gc_wide.logscale %>% select(-metavars)
-
-dens_biomarkers <-
-  map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
-  bind_cols(loads) %>%
-  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
-  filter(p.adj < 0.05) %>%
-  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
-  arrange(desc(abs(loading)))
+dens_loads <- scores(rda_dens, display = "species", scaling = 0) %>% 
+  as_tibble(rownames = "compound")
 ```
 
+1. Correlation between data and RDA axis
 
-
-## PLS for damage
 ```{r}
-pls_dam <- opls(gc_wide.logscale %>% select(-metavars), gc_wide.logscale$twister_damage,
-                plotL = FALSE)
-get_VIP(pls_dam) %>% arrange(desc(VIP))
+dens_corr <-
+  map_df(chemdata,
+         ~cor.test(.x, dens_scores$RDA1) %>%
+           broom::glance(),
+         .id = "compound") %>% 
+  select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-I think I actually like RDA better because it tells you explicitly how much variation the experimental design accounts for.  Gives an idea of how much background variation there is.  Good discussion points.
+2. Univariate linear models
+
+```{r}
+dens_lm <- 
+  map_df(chemdata, ~{
+    m <- lm(.x ~ gc_wide.logscale$density_end)
+    broom::tidy(m) %>%
+      filter(term != "(Intercept)") %>%
+      select(-term) %>% 
+      mutate(lm.AIC = broom::glance(m)$AIC)
+  },
+  .id = "compound") %>% 
+  select(compound, slope = estimate, lm.p.value = p.value, lm.AIC)
+```
+
+3. Step function
+
+```{r}
+stepfinder <- function(x, y, pts = NULL){
+
+  pts <- seq(min({{x}}), max({{x}}), length.out = 100)
+  lmlist <- map(pts, ~lm({{y}} ~ I({{x}}<=.) + I({{x}} > .)))
+  bestone <- lmlist %>% map_dbl(~AIC(.)) %>% which.min()
+  df <- tibble(#step.model = lmlist[bestone],
+               breakpoint = pts[bestone],
+               AIC = stats::AIC(lmlist[[bestone]]))
+  return(df)
+}
+
+dens_step <-
+  map_df(chemdata,
+         ~stepfinder(gc_wide.logscale$density_end, ., pts = seq(0.3, 0.7, length.out = 50)),
+         .id = "compound")
+
+dens_step %>%
+  rename(step.AIC = AIC) %>%
+  full_join(dens_corr) %>% 
+  full_join(dens_lm) %>% 
+  mutate(stepped = step.AIC < lm.AIC - 2) %>% 
+  filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
+  arrange(desc(abs(correlation))) 
+```
+Hmm... seems like too many things work as step-functions, even when I restrict the range of breakpoints.
+
+3. Join with loadings
+
+```{r}
+dens_load_tbl <- 
+  full_join(dens_loads, dens_corr, by = "compound") %>%
+  full_join(dens_lm, by = "compound")
+```
+
+4. Save this one for supplemental
+
+5. Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
+
+```{r}
+dens_biomarkers <-
+  dens_load_tbl %>% 
+  filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
+  arrange(desc(abs(correlation))) %>% 
+  select(-PC1)
+dens_biomarkers
+```
+
+6. Plot all 20 for supplemental
+
+```{r}
+#TODO
+```
 
 ## RDA for damage
 ### Fit RDA
 
 ```{r}
-rda_dam <- 
-  rda(gc_wide.logscale %>% select(-metavars) ~ twister_damage,
-      data = gc_wide.logscale)
-
-dbrda_dam <- 
-  dbrda(gc_wide.zeroes %>% select(-metavars) ~ twister_damage,
-      data = gc_wide.zeroes, distance = "euclidean")
+rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
 ```
 
 ### How much total variance does the experimental design explain?
 
 ```{r}
 MVA.synt(rda_dam)
-# MVA.synt(dbrda_dam)
 ```
 Twister leaf damage explains 8% of variation in loged scaled volatiles. 
 8.33% if I use a distance-based RDA
+
 ### ANOVA
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -239,33 +275,59 @@ anova(rda_dam)
 ```
 Marginally significant
 
-4. Then we test for significance of individual factors and interaction terms:
-
-```{r}
-MVA.anova(rda_dam)
-```
 
 ### Loadings / Correlations
 
+Setup pieces:
 ```{r}
-scores <- MVA.scores(rda_dam)$coord
-loads <- MVA.load(rda_dam)$loads %>% rename(loading = `Constr. comp. 1`)
-
-data <- gc_wide.logscale %>% select(-metavars)
-
-
-dam_biomarkers <-
-  map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
-  bind_cols(loads) %>%
-  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
-  filter(p.adj < 0.05) %>%
-  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
-  arrange(desc(abs(loading)))
-# dam_biomarkers
+dam_scores <- scores(rda_dam, display = "sites", scaling = 0) %>% as_tibble(rownames = "sample")
+dam_loads <- scores(rda_dam, display = "species", scaling = 0) %>% as_tibble(rownames = "compound")
 ```
 
-# Biomarker Table
+1. Correlation with RDA axis
 
+```{r}
+dam_corr <-
+  map_df(chemdata,
+         ~cor.test(.x, dam_scores$RDA1) %>% 
+           broom::glance(),
+         .id = "compound") %>% 
+  select(compound, correlation = estimate, corr.p.value = p.value)
+```
+
+2. Univariate linear models
+
+```{r}
+dam_lm <-
+  map_df(chemdata,
+         ~lm(.x ~ gc_wide.logscale$twister_damage) %>% 
+           broom::tidy(), 
+         .id = "compound") %>%
+  filter(term != "(Intercept)") %>% 
+  select(compound, slope = estimate, lm.p.value = p.value)
+```
+
+3. Join with loadings
+
+```{r}
+dam_load_tbl <- full_join(dam_loads, dam_corr, by = "compound") %>% full_join(dam_lm, by = "compound")
+```
+
+4. Save this one for supplemental
+
+5. Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
+
+```{r}
+dam_biomarkers <-
+  dam_load_tbl %>% 
+  filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
+  arrange(desc(abs(correlation))) %>% 
+  select(-PC1)
+dam_biomarkers
+```
+
+
+# Biomarker Table
 Join data from both response variables
 
 ```{r}
@@ -278,8 +340,19 @@ biomarker_tab <-
 ) %>% 
   mutate_all(~na_if(.,"NA")) %>% #replace text NAs with actual NAs
   mutate(`Chemical Family` = snakecase::to_sentence_case(`Chemical Family`)) %>% 
-  mutate_at(vars(loading, p.adj), round, 3) %>% 
-  select(Compound = `Pretty Name`, CAS, "RDA Loading" = loading, p = p.adj, Aroma, `Chemical Family`, response)
+  # mutate_at(vars(loading, p.adj), round, 3) %>% 
+  mutate_if(is.numeric, round, 3) %>% 
+  mutate(Compound = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>% 
+  select(Compound,
+         CAS,
+         "RDA axis loading" = RDA1,
+         "Correlation to RDA axis" = correlation,
+         "Correlation p-value" = corr.p.value,
+         "Slope" = slope,
+         "Linear model p-value" = lm.p.value,
+         Aroma,
+         `Chemical Family`,
+         "Herbivory proxy" = response)
 biomarker_tab
 ```
 
