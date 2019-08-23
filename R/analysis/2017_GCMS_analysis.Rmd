@@ -278,14 +278,41 @@ dam_corr <-
 ```
 
 #### Univariate regressions
+Here, there is no need to use scaled data.  In fact, I'm not sure that I should even use the log-transformed data.  I think if I want an effect size, it will be better to use untransformed data?
+Effect size $\beta$ is 
+$$
+\beta = \frac{SD(x)}{SD(y)} * slope
+$$
 ```{r}
-dam_lm <-
-  map_df(chemdata,
-         ~lm(.x ~ gc_wide.logscale$twister_damage) %>% 
-           broom::tidy(), 
-         .id = "compound") %>%
+dam_lm <- gc_tidy %>% 
+  group_by(Compound) %>% 
+  # mutate(RPA = scale(RPA)) %>% 
+  nest() %>% 
+  #slopes don't make sense, even when backgtransformed
+  # mutate(lm = map(data, ~lm(log(RPA) ~ twister_damage, data = .x) %>% broom::tidy())) %>%
+  #slopes are standardized
+  # mutate(lm = map(data, ~lm(scale(RPA) ~ twister_damage, data = .x) %>% broom::tidy())) %>%
+  # slopes make sense
+  # mutate(lm = map(data, ~lm(RPA ~ twister_damage, data = .x) %>% broom::tidy())) %>%
+  # slopes make sense when backtransformed
+  mutate(lm = map(data, ~glm(RPA ~ twister_damage, family = gaussian(link = "log"), data = .x) %>% broom::tidy())) %>%
+  unnest(lm, .preserve = data) %>% 
   filter(term != "(Intercept)") %>% 
-  select(compound, slope = estimate, lm.p.value = p.value)
+  mutate(slope = exp(estimate)) %>%
+  mutate(sd.y = map_dbl(data, ~sd(.x$RPA)),
+         sd.x = map_dbl(data, ~sd(.x$twister_damage))) %>% 
+  #not sure if this is correct
+  mutate(effect.size = sd.x/sd.y*slope) %>% 
+  select(compound = Compound, effect.size, lm.p.value = p.value)
+  # mutate(slope = map(lm, ~.x$coefficients[2]))
+# 
+# dam_lm <-
+#   map_df(chemdata,
+#          ~lm(.x ~ gc_wide.logscale$twister_damage) %>% 
+#            broom::tidy(), 
+#          .id = "compound") %>%
+#   filter(term != "(Intercept)") %>% 
+#   select(compound, slope = estimate, lm.p.value = p.value)
 ```
 
 #### Join with loadings
