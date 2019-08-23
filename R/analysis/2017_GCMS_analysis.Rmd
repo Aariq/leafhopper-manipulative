@@ -105,17 +105,17 @@ ggplot(gc_wide.logscale, aes(log(mean_percent_damage))) + geom_histogram(bins = 
 ```
 
 
-# Analysis
+# Descriptive statistics
+## How many compounds total?
 
-## Descriptive statistics
-1. how many compounds total?
-94
 ```{r}
-gc_tidy %>% group_by(sample) %>% tally()
+length(unique(gc_tidy$Compound))
 ```
 
-2. how many compounds are found in all samples?
-Only 4
+## How many compounds are found in all samples?
+
+Only 4!
+
 ```{r}
 gc_tidy %>% 
   group_by(Compound) %>% 
@@ -123,10 +123,9 @@ gc_tidy %>%
   filter(nsample > 18) %>% 
   rename(compound = Compound) %>%
   left_join(annotations)
-
 ```
 
-
+# Analysis
 ## RDA for density
 ### Fit RDA model
 
@@ -141,14 +140,15 @@ rda_dens <-
 ### How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda_dens)
+synt_dens <- MVA.synt(rda_dens)
+synt_dens[[1]]
 ```
 
 yeesh, only 9.12% explained by ending density
-29.24% using the distance-based model with untransformed data.  BUT, I think this is wrong.
 
 ### ANOVA
-3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
 anova(rda_dens)
@@ -157,9 +157,38 @@ anova(rda_dens)
 Significant effect of ending density on leaf volatiles
 
 
-### Loadings / Correlations
+## RDA for damage
+### Fit RDA
 
-I need to extract loadings, then figure out which compounds are signifcantly correlated with RDA axis, **not** with leafhopper density.  Should be correlation of scores with data.
+```{r}
+rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
+```
+
+### How much total variance does the experimental design explain?
+
+```{r}
+synt_dam <- MVA.synt(rda_dam)
+synt_dam[[1]]
+```
+Twister leaf damage explains 8% of variation in loged scaled volatiles. 
+
+### ANOVA
+Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(rda_dam)
+```
+
+Marginally significant
+
+
+## Biomarkers
+
+I'm defining biomarkers as compounds that are significantly correlated to the RDA axis (correlation between axis scores and chemistry data) *or* are have a significant univariate relationship with the measure of herbivory
+
+### leafhopper density biomarkers
+
+#### Extract scores and loadings
 
 ```{r}
 dens_scores <-
@@ -170,7 +199,7 @@ dens_loads <- scores(rda_dens, display = "species", scaling = 0) %>%
   as_tibble(rownames = "compound")
 ```
 
-1. Correlation between data and RDA axis
+#### Correlation between data and RDA axis
 
 ```{r}
 dens_corr <-
@@ -181,7 +210,7 @@ dens_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-2. Univariate linear models
+#### Univariate regressions
 
 ```{r}
 dens_lm <- 
@@ -196,46 +225,29 @@ dens_lm <-
   select(compound, slope = estimate, lm.p.value = p.value, lm.AIC)
 ```
 
-3. Step function
+#### Step function
 
 ```{r}
-stepfinder <- function(x, y, pts = NULL){
-
-  pts <- seq(min({{x}}), max({{x}}), length.out = 100)
-  lmlist <- map(pts, ~lm({{y}} ~ I({{x}}<=.) + I({{x}} > .)))
-  bestone <- lmlist %>% map_dbl(~AIC(.)) %>% which.min()
-  df <- tibble(#step.model = lmlist[bestone],
-               breakpoint = pts[bestone],
-               AIC = stats::AIC(lmlist[[bestone]]))
-  return(df)
-}
-
-dens_step <-
-  map_df(chemdata,
-         ~stepfinder(gc_wide.logscale$density_end, ., pts = seq(0.3, 0.7, length.out = 50)),
-         .id = "compound")
-
-dens_step %>%
-  rename(step.AIC = AIC) %>%
-  full_join(dens_corr) %>% 
-  full_join(dens_lm) %>% 
-  mutate(stepped = step.AIC < lm.AIC - 2) %>% 
-  filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
-  arrange(desc(abs(correlation))) 
+#TODO: also run a step function and extract changepoint and p-value
 ```
-Hmm... seems like too many things work as step-functions, even when I restrict the range of breakpoints.
 
-3. Join with loadings
+
+#### Join with loadings
+
+I can save this one as a supplemental document later
 
 ```{r}
 dens_load_tbl <- 
   full_join(dens_loads, dens_corr, by = "compound") %>%
   full_join(dens_lm, by = "compound")
 ```
+```{r}
+#TODO: save as supplemental
+```
 
-4. Save this one for supplemental
+#### Filter
 
-5. Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
+Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
 
 ```{r}
 dens_biomarkers <-
@@ -246,45 +258,15 @@ dens_biomarkers <-
 dens_biomarkers
 ```
 
-6. Plot all 20 for supplemental
+### Biomarkers for damage
 
-```{r}
-#TODO
-```
-
-## RDA for damage
-### Fit RDA
-
-```{r}
-rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
-```
-
-### How much total variance does the experimental design explain?
-
-```{r}
-MVA.synt(rda_dam)
-```
-Twister leaf damage explains 8% of variation in loged scaled volatiles. 
-8.33% if I use a distance-based RDA
-
-### ANOVA
-3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
-
-```{r}
-anova(rda_dam)
-```
-Marginally significant
-
-
-### Loadings / Correlations
-
-Setup pieces:
+#### Extract scores and loadings
 ```{r}
 dam_scores <- scores(rda_dam, display = "sites", scaling = 0) %>% as_tibble(rownames = "sample")
 dam_loads <- scores(rda_dam, display = "species", scaling = 0) %>% as_tibble(rownames = "compound")
 ```
 
-1. Correlation with RDA axis
+#### Correlation with RDA axis
 
 ```{r}
 dam_corr <-
@@ -295,8 +277,7 @@ dam_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-2. Univariate linear models
-
+#### Univariate regressions
 ```{r}
 dam_lm <-
   map_df(chemdata,
@@ -307,15 +288,21 @@ dam_lm <-
   select(compound, slope = estimate, lm.p.value = p.value)
 ```
 
-3. Join with loadings
+#### Join with loadings
+
+Later I can save this as supplemental document
 
 ```{r}
 dam_load_tbl <- full_join(dam_loads, dam_corr, by = "compound") %>% full_join(dam_lm, by = "compound")
 ```
 
-4. Save this one for supplemental
+```{r}
+#TODO: save for supplemental
+```
 
-5. Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
+#### Filter
+
+Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
 
 ```{r}
 dam_biomarkers <-
@@ -326,9 +313,10 @@ dam_biomarkers <-
 dam_biomarkers
 ```
 
-
 # Biomarker Table
-Join data from both response variables
+Join data from both response variables and annotate with flavor percepts and CAS numbers.
+
+It would be kind of nice if instead of slope I could report an effect size.
 
 ```{r}
 dens_biomarkers <- left_join(dens_biomarkers, annotations)
@@ -349,7 +337,7 @@ biomarker_tab <-
          "Correlation to RDA axis" = correlation,
          "Correlation p-value" = corr.p.value,
          "Slope" = slope,
-         "Linear model p-value" = lm.p.value,
+         "Linear regression p-value" = lm.p.value,
          Aroma,
          `Chemical Family`,
          "Herbivory proxy" = response)
@@ -363,6 +351,8 @@ write_excel_csv(biomarker_tab, here("figs", "2017 biomarkers.csv"), na = "-")
 ```
 
 ## Univariate plots
+
+Rather than plotting all of the biomarkers, I'll choose some representatives that I want to write about in the discussion, I think.  Also, if the step/hinge functions are significant, I should plot both the lm line and the step/hinge
 
 ```{r}
 # dens_data <- gc_tidy %>% filter(Compound %in% pull(dens_biomarkers, compound))
