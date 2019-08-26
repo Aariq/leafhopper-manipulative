@@ -1,43 +1,43 @@
-﻿Compound,CAS,RDA axis loading,Correlation to RDA axis,Correlation p-value,Slope,Linear regression p-value,Aroma,Chemical Family,Herbivory proxy
-"(E,E)-α-Farnesene",502-61-4,-0.271,-0.811,0,2.334,0,"woody, sweet, green, floral",Sesquiterpene hydrocarbon,Density
-Sulcatone,110-93-0,-0.21,-0.794,0,1.807,0.005,"green, musty, pepper, mushroom, rubber",Aliphatic ketone,Density
-β-Myrcene,123-35-3,-0.244,-0.761,0,2.108,0.001,"balsamic, must, spice",Monoterpene hydrocarbon,Density
-(E)-β-Ocimene,3379-61-1,-0.223,-0.73,0,1.927,0.002,"citrus, green, terpene",Monoterpene hydrocarbon,Density
-trans-α-Bergamotene,13474-59-4,-0.238,-0.685,0.001,2.053,0.001,"woody, warm, tea",Monoterpene hydrocarbon,Density
-Indole,120-72-9,-0.157,-0.681,0.001,1.351,0.048,"concentrated = fecal, animal; dilute = sweet, floral",Nitrogen containing,Density
-"(E,E)-Allo-ocimene",3016-19-1,-0.184,-0.668,0.002,1.586,0.017,"terpenic, sweet, fresh, floral",Monoterpene hydrocarbon,Density
-"cis-Butyric acid, 3-hexenyl ester",16491-36-4,-0.19,-0.649,0.003,1.64,0.013,"wine, green",Fatty acid ester,Density
-Hexanoic acid,142-62-1,0.133,0.639,0.003,-1.148,0.099,"cheesy, fatty",Fatty acid,Density
-(Z)-β-Ocimene,3338-55-4,-0.155,-0.625,0.004,1.338,0.051,"citrus, herbal, floral",Monoterpene hydrocarbon,Density
-trans-Dehydroxylinalool oxide,54750-70-8,-0.126,-0.62,0.005,1.089,0.119,"herbal, green, terpene",Oxygenated monoterpene,Density
-Heptanoic acid,111-14-8,0.135,0.615,0.005,-1.161,0.095,"cheesy, sour, rancid",Fatty acid,Density
-Octanoic acid,124-07-2,0.143,0.609,0.006,-1.234,0.074,"cheesy, fatty, waxy",Fatty acid,Density
-2-Methyl-1H-pyrrole,636-41-9,-0.177,-0.579,0.009,1.528,0.023,-,-,Density
-24,-,-0.141,-0.575,0.01,1.212,0.08,-,-,Density
-(3Z)-Hexenyl hexanoate,31501-11-8,-0.14,-0.53,0.02,1.207,0.081,"fruit, prune",Fatty acid ester,Density
-Linalool oxide pyranoside,14009-71-3,-0.151,-0.525,0.021,1.304,0.058,"citrus, green",-,Density
-ɣ-Butyrolactone,96-48-0,0.12,0.52,0.022,-1.034,0.14,"caramel, fatty, sweet",Oxygenated heterocycle,Density
-cis-Linalool oxide (furanoid),5989-33-3,-0.131,-0.517,0.023,1.129,0.105,"earthy, floral, sweet, woody",-,Density
-Diendiol I,13741-21-4,-0.203,-0.494,0.032,1.751,0.007,-,-,Density
-1-Hexanol,111-27-3,0.212,0.83,0,0.082,0.009,"resin, flower, green",Aliphatic alcohol,Damage
-(E)-2-Hexen-1-ol,928-95-0,0.23,0.783,0,0.089,0.004,"green, leaf, walnut",Alkenyl alcohol,Damage
-"N,N-Dibutylformamide",761-65-9,0.168,0.703,0.001,0.065,0.047,-,Nitrogen containing,Damage
-Benzothiazole,95-16-9,0.195,0.699,0.001,0.075,0.019,"rubbery, sulfury, vegetal, gasoline",Nitrogen sulfur containing,Damage
-(3Z)-Hexenyl hexanoate,31501-11-8,0.181,0.671,0.002,0.07,0.03,"fruit, prune",Fatty acid ester,Damage
-Phenethyl alcohol,60-12-8,0.212,0.671,0.002,0.082,0.009,"honey, spice, rose, lilac",Aromatic alcohol,Damage
-cis-3-Hexenyl isovalerate,35154-45-1,0.213,0.613,0.005,0.082,0.009,"fresh, green, apple, fruity, tropical, pineapple, dirty",-,Damage
-"(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,0.153,0.609,0.006,0.059,0.074,-,Aliphatic ester,Damage
-"cis-Butyric acid, 3-hexenyl ester",16491-36-4,0.182,0.604,0.006,0.07,0.03,"wine, green",Fatty acid ester,Damage
-"2-Cyclopentene-1,4-dione",930-60-9,0.19,0.575,0.01,0.073,0.023,-,Cyclic ketone,Damage
-Benzyl alcohol,100-51-6,0.168,0.561,0.012,0.065,0.048,"fruity, floral, sweet",Cyclic alcohol,Damage
-Phenylacetaldehyde,122-78-1,0.144,0.511,0.025,0.056,0.095,"floral, honey, sweet",Cyclic aldehyde,Damage
-o-Hydroxybiphenyl,90-43-7,0.119,0.505,0.027,0.046,0.172,-,-,Damage
-Dodecanoic acid,143-07-7,0.136,0.473,0.041,0.052,0.117,"mild, fatty, coconut, bay oil, metal",-,Damage
-"2,4-Di-tert-butylphenol",96-76-4,0.165,0.472,0.041,0.064,0.051,-,-,Damage
-Tetradecanoic acid,544-63-8,0.123,0.466,0.044,0.047,0.159,"coconut, soapy, waxy",Fatty acid,Damage
-(Z)-β-Ocimene,3338-55-4,-0.172,-0.466,0.044,-0.066,0.042,"citrus, herbal, floral",Monoterpene hydrocarbon,Damage
-Mesityl oxide,141-79-7,0.049,0.459,0.048,0.019,0.585,"acrylic, earthy, sweet, chemical",Aliphatic ketone,Damage
-Diendiol I,13741-21-4,0.195,0.45,0.054,0.075,0.019,-,-,Damage
-197,-,0.2,0.445,0.056,0.077,0.015,-,-,Damage
-cis-Methyl dihydrojasmonate,39647-11-5,-0.174,-0.432,0.065,-0.067,0.038,"jasmine, floral, green",Cyclic ester,Damage
-α-Hydroxy-ɣ-butyrolactone,19444-84-9,0.176,0.361,0.129,0.068,0.036,-,Oxygenated heterocycle,Damage
+﻿Compound,CAS,RDA axis loading,Correlation to RDA axis,Correlation p-value,Slope,Linear regression p-value,Change point,Aroma,Chemical Family,Herbivory proxy
+"(E,E)-α-Farnesene",502-61-4,-0.271,-0.811,0,6.4,0,0.333,"woody, sweet, green, floral",Sesquiterpene hydrocarbon,Density
+Sulcatone,110-93-0,-0.21,-0.794,0,2.212,0.005,0.625,"green, musty, pepper, mushroom, rubber",Aliphatic ketone,Density
+β-Myrcene,123-35-3,-0.244,-0.761,0,1.336,0.001,0.682,"balsamic, must, spice",Monoterpene hydrocarbon,Density
+(E)-β-Ocimene,3379-61-1,-0.223,-0.73,0,5.227,0.002,0.167,"citrus, green, terpene",Monoterpene hydrocarbon,Density
+trans-α-Bergamotene,13474-59-4,-0.238,-0.685,0.001,1.923,0.001,0.5,"woody, warm, tea",Monoterpene hydrocarbon,Density
+Indole,120-72-9,-0.157,-0.681,0.001,1.614,0.048,0.682,"concentrated = fecal, animal; dilute = sweet, floral",Nitrogen containing,Density
+"(E,E)-Allo-ocimene",3016-19-1,-0.184,-0.668,0.002,1.867,0.017,0.167,"terpenic, sweet, fresh, floral",Monoterpene hydrocarbon,Density
+"cis-Butyric acid, 3-hexenyl ester",16491-36-4,-0.19,-0.649,0.003,1.941,0.013,-,"wine, green",Fatty acid ester,Density
+Hexanoic acid,142-62-1,0.133,0.639,0.003,-2.236,0.099,-,"cheesy, fatty",Fatty acid,Density
+(Z)-β-Ocimene,3338-55-4,-0.155,-0.625,0.004,1.713,0.051,0.167,"citrus, herbal, floral",Monoterpene hydrocarbon,Density
+trans-Dehydroxylinalool oxide,54750-70-8,-0.126,-0.62,0.005,0.751,0.119,-,"herbal, green, terpene",Oxygenated monoterpene,Density
+Heptanoic acid,111-14-8,0.135,0.615,0.005,-2.037,0.095,-,"cheesy, sour, rancid",Fatty acid,Density
+Octanoic acid,124-07-2,0.143,0.609,0.006,-2.367,0.074,-,"cheesy, fatty, waxy",Fatty acid,Density
+2-Methyl-1H-pyrrole,636-41-9,-0.177,-0.579,0.009,0.907,0.023,0.5,-,Nitrogen containing,Density
+24,-,-0.141,-0.575,0.01,0.846,0.08,-,-,-,Density
+(3Z)-Hexenyl hexanoate,31501-11-8,-0.14,-0.53,0.02,1.516,0.081,-,"fruit, prune",Fatty acid ester,Density
+cis-Linalool oxide (pyranoid),14009-71-3,-0.151,-0.525,0.021,1.494,0.058,-,"citrus, green",-,Density
+ɣ-Butyrolactone,96-48-0,0.12,0.52,0.022,-0.749,0.14,-,"caramel, fatty, sweet",Oxygenated heterocycle,Density
+cis-Linalool oxide (furanoid),5989-33-3,-0.131,-0.517,0.023,1.761,0.105,-,"earthy, floral, sweet, woody",Oxygenated heterocycle,Density
+Diendiol I,13741-21-4,-0.203,-0.494,0.032,2.011,0.007,0.429,-,Oxygenated monoterpene,Density
+1-Hexanol,111-27-3,0.212,0.83,0,0.096,0.009,4.206,"resin, flower, green",Aliphatic alcohol,Damage
+(E)-2-Hexen-1-ol,928-95-0,0.23,0.783,0,0.093,0.004,2.409,"green, leaf, walnut",Alkenyl alcohol,Damage
+"N,N-Dibutylformamide",761-65-9,0.168,0.703,0.001,0.078,0.047,-,-,Nitrogen containing,Damage
+Benzothiazole,95-16-9,0.195,0.699,0.001,0.074,0.019,-,"rubbery, sulfury, vegetal, gasoline",Nitrogen sulfur containing,Damage
+(3Z)-Hexenyl hexanoate,31501-11-8,0.181,0.671,0.002,0.088,0.03,-,"fruit, prune",Fatty acid ester,Damage
+Phenethyl alcohol,60-12-8,0.212,0.671,0.002,0.119,0.009,4.206,"honey, spice, rose, lilac",Aromatic alcohol,Damage
+cis-3-Hexenyl isovalerate,35154-45-1,0.213,0.613,0.005,0.08,0.009,8.541,"fresh, green, apple, fruity, tropical, pineapple, dirty",Fatty acid ester,Damage
+"(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,0.153,0.609,0.006,0.031,0.074,-,-,Aliphatic ester,Damage
+"cis-Butyric acid, 3-hexenyl ester",16491-36-4,0.182,0.604,0.006,0.083,0.03,1.798,"wine, green",Fatty acid ester,Damage
+"2-Cyclopentene-1,4-dione",930-60-9,0.19,0.575,0.01,0.042,0.023,4.206,-,Cyclic ketone,Damage
+Benzyl alcohol,100-51-6,0.168,0.561,0.012,0.07,0.048,2.4,"fruity, floral, sweet",Cyclic alcohol,Damage
+Phenylacetaldehyde,122-78-1,0.144,0.511,0.025,0.046,0.095,-,"floral, honey, sweet",Cyclic aldehyde,Damage
+o-Hydroxybiphenyl,90-43-7,0.119,0.505,0.027,0.037,0.172,-,-,Aromatic compound,Damage
+Dodecanoic acid,143-07-7,0.136,0.473,0.041,0.083,0.117,-,"mild, fatty, coconut, bay oil, metal",-,Damage
+"2,4-Di-tert-butylphenol",96-76-4,0.165,0.472,0.041,0.029,0.051,-,-,-,Damage
+Tetradecanoic acid,544-63-8,0.123,0.466,0.044,0.041,0.159,-,"coconut, soapy, waxy",Fatty acid,Damage
+(Z)-β-Ocimene,3338-55-4,-0.172,-0.466,0.044,-0.085,0.042,-,"citrus, herbal, floral",Monoterpene hydrocarbon,Damage
+Mesityl oxide,141-79-7,0.049,0.459,0.048,0.012,0.585,-,"acrylic, earthy, sweet, chemical",Aliphatic ketone,Damage
+Diendiol I,13741-21-4,0.195,0.45,0.054,0.086,0.019,0.66,-,Oxygenated monoterpene,Damage
+197,-,0.2,0.445,0.056,0.09,0.015,-,-,-,Damage
+cis-Methyl dihydrojasmonate,39647-11-5,-0.174,-0.432,0.065,-0.042,0.038,-,"jasmine, floral, green",Cyclic ester,Damage
+α-Hydroxy-ɣ-butyrolactone,19444-84-9,0.176,0.361,0.129,0.076,0.036,-,-,Oxygenated heterocycle,Damage

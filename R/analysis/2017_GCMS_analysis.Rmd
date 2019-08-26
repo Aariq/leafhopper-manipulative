@@ -25,6 +25,8 @@ library(vegan)
 library(RVAideMemoire)
 #for figures:
 library(cowplot)
+#for step and hinge models
+library(chngpt)
 ```
 
 # Purpose
@@ -41,7 +43,8 @@ gc_wide.zeroes <- read_rds(here("data", "cleaned", "2017_gcms_zeroes.rds"))
 ```
 
 ```{r}
-annotations <- read_excel(here("data", "cleaned", "Compound annotation updated.xlsx")) %>% rename(compound = Compound)
+annotations <- read_excel(here("data", "cleaned", "Compound annotation updated.xlsx")) %>%
+  rename(compound = Compound)
 ```
 
 
@@ -135,6 +138,14 @@ Only analysis for the regular RDA is shown, because the distance-based RDA gave 
 #scaled, transformed
 rda_dens <-
   rda(chemdata ~ gc_wide.logscale$density_end)
+
+# #try with un-transformed
+# gc_wide.scale <- gc_wide.zeroes %>% mutate_at(vars(-metavars), scale)
+# rda_dens2 <- rda(gc_wide.scale %>% select(-metavars) ~ gc_wide.scale$density_end)
+# 
+# ordiresids(rda_dens, kind = "qqmath",  residuals = "working")
+# ordiresids(rda_dens2, kind = "qqmath", residuals = "working")
+# #log transformation DEFINITELY helps improve normality
 ```
 
 ### How much total variance does the experimental design explain?
@@ -212,23 +223,82 @@ dens_corr <-
 
 #### Univariate regressions
 
+Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
+
 ```{r}
-dens_lm <- 
-  map_df(chemdata, ~{
-    m <- lm(.x ~ gc_wide.logscale$density_end)
-    broom::tidy(m) %>%
-      filter(term != "(Intercept)") %>%
-      select(-term) %>% 
-      mutate(lm.AIC = broom::glance(m)$AIC)
-  },
-  .id = "compound") %>% 
-  select(compound, slope = estimate, lm.p.value = p.value, lm.AIC)
+myrc <- lm(Myrcene ~ density_end, data = gc_wide)
+myrc.log <- lm(log(Myrcene) ~ density_end, data = gc_wide)
+shapiro.test(myrc$residuals)
+shapiro.test(myrc.log$residuals)
+plot(myrc)
+plot(myrc.log)
+
+farn <- lm(`Farnesene<(E,E)-alpha->` ~ density_end, data = gc_wide)
+farn.log <- lm(log(`Farnesene<(E,E)-alpha->`) ~ density_end, data = gc_wide)
+farn.glm <- glm(`Farnesene<(E,E)-alpha->` ~ density_end, family = gaussian(link = "log"), data = gc_wide)
+shapiro.test(farn$residuals)
+shapiro.test(farn.log$residuals)
+shapiro.test(farn.glm$residuals)
+plot(farn)
+plot(farn.log)
+plot(farn.glm)
 ```
+
+```{r}
+biom_data <-
+  gc_tidy %>% 
+  add_column(rand = rnorm(nrow(gc_tidy), 0.00001, 0.00001)) %>% 
+  mutate(log.RPA = log(RPA),
+         density_end2 = density_end + abs(rand)) %>% 
+  rename(compound = Compound)
+  
+dens_lm <- 
+  biom_data %>% 
+  group_by(compound) %>% 
+  nest() %>% 
+  mutate(lm = map(data, ~lm(log.RPA ~ density_end, data = .x))) %>% 
+  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>% 
+  unnest(lm.tidy, .preserve = lm) %>% 
+  filter(term != "(Intercept)") %>% 
+  select(-term) %>% 
+  select(compound, lm, lm.slope = estimate, lm.p.value = p.value)
+
+dens_lm
+```
+
 
 #### Step function
 
+Write my own function to get p-value and changepoint from chngpt.test and coefs from chngptm.  Man, this package sucks.
+
 ```{r}
-#TODO: also run a step function and extract changepoint and p-value
+mychngpt <- function(formula.1, formula.2, ...){
+
+  test <- chngpt.test(formula.1, formula.2, ...)
+  m <- chngptm(formula.1, formula.2, ...)
+  tidydf <- 
+    coef(m) %>% 
+    enframe(name = "term") %>% 
+    spread(key = term, value = value) %>% 
+    add_column(p.value = test$p.value,
+               chngpt = test$chngpt)
+  return(tidydf)
+}
+```
+
+
+```{r}
+dens_step <-
+  biom_data %>% 
+  nest() %>% 
+  mutate(step = map(data,
+                    ~mychngpt(log.RPA ~ 1, ~ density_end2,
+                              data = .x,
+                              type = "step",
+                              family = "gaussian",
+                              chngpts.cnt	= 100))) %>% 
+  unnest(step) %>% 
+  rename(step.p.value = p.value)
 ```
 
 
@@ -239,7 +309,10 @@ I can save this one as a supplemental document later
 ```{r}
 dens_load_tbl <- 
   full_join(dens_loads, dens_corr, by = "compound") %>%
-  full_join(dens_lm, by = "compound")
+  full_join(dens_lm, by = "compound") %>% 
+  full_join(dens_step, by = "compound") %>% 
+arrange(desc(abs(correlation)))
+dens_load_tbl
 ```
 ```{r}
 #TODO: save as supplemental
@@ -252,11 +325,15 @@ Filter by either significant correlation to RDA or significant univariate regres
 ```{r}
 dens_biomarkers <-
   dens_load_tbl %>% 
+  # mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
+  #        step.p.value = p.adjust(step.p.value, "fdr")) %>% 
   filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
   arrange(desc(abs(correlation))) %>% 
-  select(-PC1)
+  select(-PC1) %>% 
+  mutate(compound = fct_inorder(compound))
 dens_biomarkers
 ```
+
 
 ### Biomarkers for damage
 
@@ -278,49 +355,48 @@ dam_corr <-
 ```
 
 #### Univariate regressions
-Here, there is no need to use scaled data.  In fact, I'm not sure that I should even use the log-transformed data.  I think if I want an effect size, it will be better to use untransformed data?
-Effect size $\beta$ is 
-$$
-\beta = \frac{SD(x)}{SD(y)} * slope
-$$
+
 ```{r}
-dam_lm <- gc_tidy %>% 
-  group_by(Compound) %>% 
-  # mutate(RPA = scale(RPA)) %>% 
+dam_lm <- 
+  biom_data %>% 
+  group_by(compound) %>% 
   nest() %>% 
-  #slopes don't make sense, even when backgtransformed
-  # mutate(lm = map(data, ~lm(log(RPA) ~ twister_damage, data = .x) %>% broom::tidy())) %>%
-  #slopes are standardized
-  # mutate(lm = map(data, ~lm(scale(RPA) ~ twister_damage, data = .x) %>% broom::tidy())) %>%
-  # slopes make sense
-  # mutate(lm = map(data, ~lm(RPA ~ twister_damage, data = .x) %>% broom::tidy())) %>%
-  # slopes make sense when backtransformed
-  mutate(lm = map(data, ~glm(RPA ~ twister_damage, family = gaussian(link = "log"), data = .x) %>% broom::tidy())) %>%
-  unnest(lm, .preserve = data) %>% 
+  mutate(lm = map(data, ~lm(log.RPA ~ twister_damage, data = .x))) %>% 
+  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>% 
+  unnest(lm.tidy, .preserve = lm) %>% 
   filter(term != "(Intercept)") %>% 
-  mutate(slope = exp(estimate)) %>%
-  mutate(sd.y = map_dbl(data, ~sd(.x$RPA)),
-         sd.x = map_dbl(data, ~sd(.x$twister_damage))) %>% 
-  #not sure if this is correct
-  mutate(effect.size = sd.x/sd.y*slope) %>% 
-  select(compound = Compound, effect.size, lm.p.value = p.value)
-  # mutate(slope = map(lm, ~.x$coefficients[2]))
-# 
-# dam_lm <-
-#   map_df(chemdata,
-#          ~lm(.x ~ gc_wide.logscale$twister_damage) %>% 
-#            broom::tidy(), 
-#          .id = "compound") %>%
-#   filter(term != "(Intercept)") %>% 
-#   select(compound, slope = estimate, lm.p.value = p.value)
+  select(-term) %>% 
+  select(compound, lm, lm.slope = estimate, lm.p.value = p.value)
+
+dam_lm
 ```
+
+#### Step function
+
+```{r}
+dam_step <-
+  biom_data %>% 
+  nest() %>% 
+  mutate(step = map(data,
+                    ~mychngpt(log.RPA ~ 1, ~ twister_damage,
+                              data = .x,
+                              type = "step",
+                              family = "gaussian",
+                              chngpts.cnt	= 100))) %>% 
+  unnest(step) %>% 
+  rename(step.p.value = p.value)
+```
+
 
 #### Join with loadings
 
 Later I can save this as supplemental document
 
 ```{r}
-dam_load_tbl <- full_join(dam_loads, dam_corr, by = "compound") %>% full_join(dam_lm, by = "compound")
+dam_load_tbl <-
+  full_join(dam_loads, dam_corr, by = "compound") %>%
+  full_join(dam_lm, by = "compound") %>% 
+  full_join(dam_step, by = "compound")
 ```
 
 ```{r}
@@ -355,16 +431,18 @@ biomarker_tab <-
 ) %>% 
   mutate_all(~na_if(.,"NA")) %>% #replace text NAs with actual NAs
   mutate(`Chemical Family` = snakecase::to_sentence_case(`Chemical Family`)) %>% 
-  # mutate_at(vars(loading, p.adj), round, 3) %>% 
-  mutate_if(is.numeric, round, 3) %>% 
+  # only keep changepoing if changepoint test is significant
+  mutate(chngpt = ifelse(step.p.value > 0.05, NA, chngpt)) %>% 
+    mutate_if(is.numeric, round, 3) %>% 
   mutate(Compound = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>% 
   select(Compound,
          CAS,
          "RDA axis loading" = RDA1,
          "Correlation to RDA axis" = correlation,
          "Correlation p-value" = corr.p.value,
-         "Slope" = slope,
+         "Slope" = lm.slope,
          "Linear regression p-value" = lm.p.value,
+         "Change point" = chngpt,
          Aroma,
          `Chemical Family`,
          "Herbivory proxy" = response)
@@ -377,62 +455,86 @@ write to CSV for formatting in Numbers / Excel
 write_excel_csv(biomarker_tab, here("figs", "2017 biomarkers.csv"), na = "-")
 ```
 
-## Univariate plots
+# Plots
 
 Rather than plotting all of the biomarkers, I'll choose some representatives that I want to write about in the discussion, I think.  Also, if the step/hinge functions are significant, I should plot both the lm line and the step/hinge
+
+## Density Biomarkers
 
 ```{r}
 # dens_data <- gc_tidy %>% filter(Compound %in% pull(dens_biomarkers, compound))
 
 dens_data <-
-  left_join(dens_biomarkers, gc_tidy) %>% 
-  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(loading), .desc = TRUE))
+  dens_biomarkers %>% 
+  unnest(data) %>% 
+  mutate_at(vars("(Intercept)", "I(density_end2>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
+  left_join(gc_tidy) %>% 
+  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
+dens_data2 <- 
+  dens_data %>% filter(lm.p.value <= 0.05)
 
 dens_plot <-
-  ggplot(dens_data, aes(x = density_end, y = RPA)) +
+  ggplot(dens_data, aes(x = density_end, y = log.RPA)) +
   geom_point() +
+  # add lm when significant
+  geom_smooth(method = "lm", se = FALSE, data = dens_data2, linetype = 5, color = "grey50") +
+  # add step when significant
+  geom_segment(aes(x = 0,
+                 xend = chngpt,
+                 y = `(Intercept)`,
+                 yend = `(Intercept)`), color = "grey50") +
+  geom_segment(aes(x = chngpt,
+                   xend = 1.142857,
+                   y = `(Intercept)`+`I(density_end2>chngpt)`, 
+                   yend = `(Intercept)`+`I(density_end2>chngpt)`), color = "grey50") +
   facet_wrap(~`Pretty Name`, scales = "free_y") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  labs(x = "Leafhopper density (insects / young leaf)",
-       y = "Relative peak area")
-dens_plot
+  theme_bw()
 ```
 
 ```{r}
 save_plot(here("figs", "density-biomarkers.png"), dens_plot,
-          ncol = 4,
+          ncol = 5,
           nrow = 4, 
           base_height = 2,
           base_asp = 1.3)
 ```
 
 
-## Univariate plots
-
-Here, I should plot these biomarkers and look for thresholds/non-linear patterns.
-
+## Damage biomarkers
 ```{r}
 dam_data <-
-  left_join(dam_biomarkers, gc_tidy) %>% 
-  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(loading), .desc = TRUE))
+  dam_biomarkers %>% 
+  unnest(data) %>% 
+  mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
+  left_join(gc_tidy) %>% 
+  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
+
+dam_data2 <- 
+  dam_data %>% filter(lm.p.value <= 0.05)
 
 dam_plot <-
-  ggplot(dam_data, aes(x = twister_damage, y = RPA)) +
+  ggplot(dam_data, aes(x = twister_damage, y = log.RPA)) +
   geom_point() +
-  facet_wrap(~`Pretty Name`, scale = "free_y") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  labs(x = "% Damage to DCSE focal leaf",
-       y = "Relative peak area")
-dam_plot
+  # add lm when significant
+  geom_smooth(method = "lm", se = FALSE, data = dam_data2, linetype = 5, color = "grey50") +
+  # add step when significant
+  geom_segment(aes(x = min(gc_tidy$twister_damage),
+                 xend = chngpt,
+                 y = `(Intercept)`,
+                 yend = `(Intercept)`), color = "grey50") +
+  geom_segment(aes(x = chngpt,
+                   xend = max(gc_tidy$twister_damage),
+                   y = `(Intercept)`+`I(twister_damage>chngpt)`, 
+                   yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "grey50") +
+  facet_wrap(~`Pretty Name`, scales = "free_y") +
+  theme_bw()
 ```
 
 ```{r}
 save_plot(here("figs", "damage-biomarkers.png"), dam_plot,
-          ncol = 3,
-          nrow = 2,
+          ncol = 5,
+          nrow = 5,
           base_height = 2,
           base_asp = 1.3)
 ```
