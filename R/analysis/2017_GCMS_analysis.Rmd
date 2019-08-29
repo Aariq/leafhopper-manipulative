@@ -247,9 +247,7 @@ plot(farn.glm)
 ```{r}
 biom_data <-
   gc_tidy %>% 
-  add_column(rand = rnorm(nrow(gc_tidy), 0.00001, 0.00001)) %>% 
-  mutate(log.RPA = log(RPA),
-         density_end2 = density_end + abs(rand)) %>% 
+  mutate(log.RPA = log(RPA)) %>% 
   rename(compound = Compound)
   
 dens_lm <- 
@@ -286,13 +284,19 @@ mychngpt <- function(formula.1, formula.2, ...){
 }
 ```
 
+See if I can get confidence intervals for changepoint.  If they include zero, I should not include them
+
+```{r}
+biom_data
+```
+
 
 ```{r}
 dens_step <-
   biom_data %>% 
   nest() %>% 
   mutate(step = map(data,
-                    ~mychngpt(log.RPA ~ 1, ~ density_end2,
+                    ~mychngpt(log.RPA ~ 1, ~ density_end,
                               data = .x,
                               type = "step",
                               family = "gaussian",
@@ -476,7 +480,7 @@ dens_data <-
   #take top 9 biomarkers
   slice(1:9) %>% 
   unnest(data) %>% 
-  mutate_at(vars("(Intercept)", "I(density_end2>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
+  mutate_at(vars("(Intercept)", "I(density_end>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
   left_join(gc_tidy) %>% 
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
@@ -495,8 +499,8 @@ dens_plot <-
                  yend = `(Intercept)`), color = "grey50") +
   geom_segment(aes(x = chngpt,
                    xend = 1.142857,
-                   y = `(Intercept)`+`I(density_end2>chngpt)`, 
-                   yend = `(Intercept)`+`I(density_end2>chngpt)`), color = "grey50") +
+                   y = `(Intercept)`+`I(density_end>chngpt)`, 
+                   yend = `(Intercept)`+`I(density_end>chngpt)`), color = "grey50") +
   facet_wrap(~`Pretty Name`, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Leafhopper density (insects / young leaf)") +
   theme_bw()
