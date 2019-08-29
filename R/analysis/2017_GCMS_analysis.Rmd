@@ -225,24 +225,6 @@ dens_corr <-
 
 Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
 
-```{r}
-myrc <- lm(Myrcene ~ density_end, data = gc_wide)
-myrc.log <- lm(log(Myrcene) ~ density_end, data = gc_wide)
-shapiro.test(myrc$residuals)
-shapiro.test(myrc.log$residuals)
-plot(myrc)
-plot(myrc.log)
-
-farn <- lm(`Farnesene<(E,E)-alpha->` ~ density_end, data = gc_wide)
-farn.log <- lm(log(`Farnesene<(E,E)-alpha->`) ~ density_end, data = gc_wide)
-farn.glm <- glm(`Farnesene<(E,E)-alpha->` ~ density_end, family = gaussian(link = "log"), data = gc_wide)
-shapiro.test(farn$residuals)
-shapiro.test(farn.log$residuals)
-shapiro.test(farn.glm$residuals)
-plot(farn)
-plot(farn.log)
-plot(farn.glm)
-```
 
 ```{r}
 biom_data <-
@@ -273,22 +255,20 @@ Write my own function to get p-value and changepoint from chngpt.test and coefs 
 mychngpt <- function(formula.1, formula.2, ...){
 
   test <- chngpt.test(formula.1, formula.2, ...)
-  m <- chngptm(formula.1, formula.2, ...)
+  m <- chngptm(formula.1, formula.2, var.type = "bootstrap", ci.bootstrap.size = 100, ...)
+  m.summary <- summary(m)
   tidydf <- 
     coef(m) %>% 
     enframe(name = "term") %>% 
     spread(key = term, value = value) %>% 
     add_column(p.value = test$p.value,
-               chngpt = test$chngpt)
+               chngpt = m.summary$chngpt[1],
+               chngpt.lowerCI = m.summary$chngpt[2],
+               chngpt.upperCI = m.summary$chngpt[3])
   return(tidydf)
 }
 ```
 
-See if I can get confidence intervals for changepoint.  If they include zero, I should not include them
-
-```{r}
-biom_data
-```
 
 
 ```{r}
@@ -300,7 +280,7 @@ dens_step <-
                               data = .x,
                               type = "step",
                               family = "gaussian",
-                              chngpts.cnt	= 100))) %>% 
+                              chngpts.cnt	= 50))) %>% 
   unnest(step) %>% 
   rename(step.p.value = p.value)
 ```
@@ -337,7 +317,6 @@ dens_biomarkers <-
   arrange(desc(abs(correlation))) %>% 
   select(-PC1) %>% 
   mutate(compound = fct_inorder(compound))
-dens_biomarkers
 ```
 
 
@@ -432,38 +411,75 @@ Join data from both response variables and annotate with flavor percepts and CAS
 It would be kind of nice if instead of slope I could report an effect size.
 
 ```{r}
+#Join with annotations to get CAS numbers and better names
 dens_biomarkers <- left_join(dens_biomarkers, annotations)
 dam_biomarkers <- left_join(dam_biomarkers, annotations)
+```
+
+```{r}
+#Combine density and damage biomarkers
 biomarker_tab <-
   bind_rows(
   dens_biomarkers %>% add_column(response = "Density"),
   dam_biomarkers %>% add_column(response = "Damage")
-) %>% 
+) 
+```
+
+Formatting:
+```{r}
+biomarker_tab1 <-
+  biomarker_tab %>% 
   mutate_all(~na_if(.,"NA")) %>% #replace text NAs with actual NAs
+  # get pretty names, unless it's an unkown
+  mutate(Compound = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>%
+  # formate chemical family
   mutate(`Chemical Family` = snakecase::to_sentence_case(`Chemical Family`)) %>% 
-  # only keep changepoing if changepoint test is significant
-  mutate(chngpt = ifelse(step.p.value > 0.05, NA, chngpt)) %>% 
-    mutate_if(is.numeric, round, 3) %>% 
-  mutate(Compound = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>% 
-  select(Compound,
+  # Add significance stars to all coefficients
+  mutate_if(is.numeric, round, 3) %>% 
+  mutate(lm.slope = case_when(
+    lm.p.value <= 0.001 ~ paste0(lm.slope, "***"),
+    lm.p.value <= 0.01  ~ paste0(lm.slope, "**"),
+    lm.p.value <=0.05   ~ paste0(lm.slope, "*"),
+    TRUE                ~ as.character(lm.slope)
+  )) %>% 
+  mutate(correlation = case_when(
+    corr.p.value <= 0.001 ~ paste0(correlation, "***"),
+    corr.p.value <= 0.01  ~ paste0(correlation, "**"),
+    corr.p.value <=0.05   ~ paste0(correlation, "*"),
+    TRUE                  ~ as.character(correlation)
+  )) %>% 
+  #might also need to include upper bounds above max damage/max density
+  mutate(chngpt = case_when(
+    step.p.value <= 0.001 & chngpt.lowerCI > 0  ~ paste0(chngpt, "***"),
+    step.p.value <= 0.01 & chngpt.lowerCI > 0   ~ paste0(chngpt, "**"),
+    step.p.value <= 0.05 & chngpt.lowerCI > 0   ~ paste0(chngpt, "*"),
+    step.p.value <= 0.05 & chngpt.lowerCI <= 0 ~ paste0(chngpt, "a"), 
+    TRUE                                        ~ as.character(chngpt)
+  ))
+```
+Select columns
+```{r}
+biomarker_tab2 <-
+  biomarker_tab1 %>% 
+  select("Herbivory proxy" = response,
+         Compound,
          CAS,
          "RDA axis loading" = RDA1,
          "Correlation to RDA axis" = correlation,
-         "Correlation p-value" = corr.p.value,
-         "Slope" = lm.slope,
-         "Linear regression p-value" = lm.p.value,
-         "Step" = chngpt,
-         "Step p-value" = step.p.value,
+         # "Correlation p-value" = corr.p.value,
+         "Liner regression slope" = lm.slope,
+         # "Linear regression p-value" = lm.p.value,
+         "Change point" = chngpt,
+         # "Step p-value" = step.p.value,
          Aroma,
-         `Chemical Family`,
-         "Herbivory proxy" = response)
-biomarker_tab
+         `Chemical Family`)
+biomarker_tab2
 ```
 
 write to CSV for formatting in Numbers / Excel
 
 ```{r}
-write_excel_csv(biomarker_tab, here("figs", "2017 biomarkers.csv"), na = "-")
+write_excel_csv(biomarker_tab2, here("figs", "2017 biomarkers.csv"))
 ```
 
 # Plots
@@ -480,7 +496,8 @@ dens_data <-
   #take top 9 biomarkers
   slice(1:9) %>% 
   unnest(data) %>% 
-  mutate_at(vars("(Intercept)", "I(density_end>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
+  mutate_at(vars("(Intercept)", "I(density_end>chngpt)", "chngpt"),
+            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <=0, NA, .)) %>% 
   left_join(gc_tidy) %>% 
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
@@ -524,7 +541,8 @@ dam_data <-
   #take top 9 for plotting
   slice(1:9) %>% 
   unnest(data) %>% 
-  mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"), ~ifelse(step.p.value > 0.05, NA, .)) %>% 
+  mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"),
+            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <= 0, NA, .)) %>% 
   left_join(gc_tidy) %>% 
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
