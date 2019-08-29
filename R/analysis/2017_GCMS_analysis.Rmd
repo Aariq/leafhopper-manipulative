@@ -467,7 +467,7 @@ biomarker_tab2 <-
          "RDA axis loading" = RDA1,
          "Correlation to RDA axis" = correlation,
          # "Correlation p-value" = corr.p.value,
-         "Liner regression slope" = lm.slope,
+         "Linear regression slope" = lm.slope,
          # "Linear regression p-value" = lm.p.value,
          "Change point" = chngpt,
          # "Step p-value" = step.p.value,
