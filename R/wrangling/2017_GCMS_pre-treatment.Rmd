@@ -304,7 +304,7 @@ All compounds have mean Q-value > 90.
 gc_tidy.final %>% 
   group_by(Compound) %>% 
   summarize(meanQ = mean(QVal, na.rm = TRUE)) %>% 
-  arrange(meanQ) %>% 
+  arrange(meanQ)
 ```
 
 # Create wide data frame
@@ -313,13 +313,13 @@ gc_tidy.final %>%
 gc_wide <- 
   gc_tidy.final %>%
   ungroup() %>% 
-  select(-rt, -ri, -No., -present, -CAS) %>%
+  select(-rt, -ri, -No., -present, -CAS, -QVal) %>%
   spread(key = Compound, value = RPA)
 
 gc_wide.zeroes <-
   gc_zeroes.final %>% 
   ungroup %>% 
-  select(-rt, -ri, -No., -present, -CAS) %>% 
+  select(-rt, -ri, -No., -present, -CAS, -QVal) %>% 
   spread(key = Compound, value = RPA)
 ```
 
@@ -343,7 +343,7 @@ metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percen
 test <-
   gc_tidy.final %>%
   ungroup() %>% 
-  select(-rt, -ri, -No., -present, -CAS) %>% 
+  select(-rt, -ri, -No., -present, -CAS, -QVal) %>% 
   spread(key = Compound, value = RPA) %>% 
   select(-metavars) %>%
   # mutate_all(~.*1000) %>%
