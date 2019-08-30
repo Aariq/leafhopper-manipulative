@@ -139,12 +139,16 @@ damage2018 <- damage2018 %>% filter(sample != "J23")
 
 #re-create plot
 dens_dam_2018 <-
-  ggplot(damage2018, aes(x = density_end, y = mean_percent_damage, color = cultivar, label = sample)) +
+  ggplot(damage2018,
+         aes(x = density_end, y = mean_percent_damage,
+             color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"),
+             label = sample)) +
   geom_point() +
   labs(x = "Final leafhopper density (insects / shoot)",
        y = "Mean % damaged leaf area",
        subtitle = "2018") +
-  scale_color_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
+  scale_color_discrete(name = "Cultivar", labels = c("L" = "LJ", "J" = "JGY")) +
+  scale_shape_discrete(name = "Cultivar", labels = c("L" = "LJ", "J" = "JGY")) +
   theme_bw()
 dens_dam_2018
 ```
@@ -182,7 +186,7 @@ Representative leaves:
 
 - low: Q11 leaf 1, 0.56 % damage
 - mid: Q9 leaf 3, 1.87% damage
-- high: Q18 leaf 3, 12.68% damage (hopperburn)
+- high: Q18 leaf 3, 12.68% damage (necrosis at leaf margins)
 - high: Q13 leaf 7, 8.71% damage 
 
 ```{r}
@@ -195,9 +199,12 @@ mid<- image_read(here("img", "mid-damage.png")) %>%
 high <- image_read(here("img", "high-damage.png")) %>%
   image_scale("x600") %>% 
   image_annotate("8.71%", size = 30, location = "+10+10")
+high2 <- image_read(here("img", "high-damage2.png")) %>% 
+  image_scale("x600") %>% 
+  image_annotate("12.68%", size = 30, location = "+10+10")
 
 leaf_examples <-
-  image_append(c(low, mid, high)) %>%
+  image_append(c(low, mid, high, high2)) %>%
   image_border("white", "50x50") %>% 
   rasterGrob()
 ```
