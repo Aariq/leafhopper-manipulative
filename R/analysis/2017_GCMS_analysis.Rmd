@@ -312,8 +312,8 @@ dens_biomarkers <-
   # filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
   filter(corr.p.value <= 0.05) %>% 
   # Elizabeth suggested against doing this:
-  mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
-         step.p.value = p.adjust(step.p.value, "fdr")) %>%
+  # mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
+  #        step.p.value = p.adjust(step.p.value, "fdr")) %>%
   arrange(desc(abs(correlation))) %>% 
   select(-PC1) %>% 
   mutate(compound = fct_inorder(compound))
@@ -361,6 +361,7 @@ dam_lm
 ```{r}
 dam_step <-
   biom_data %>% 
+  group_by(compound) %>% 
   nest() %>% 
   mutate(step = map(data,
                     ~mychngpt(log.RPA ~ 1, ~ twister_damage,
@@ -398,8 +399,8 @@ dam_biomarkers <-
   # filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
   filter(corr.p.value <= 0.05) %>% 
   # Elizabeth suggested against doing this:
-  mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
-         step.p.value = p.adjust(step.p.value, "fdr")) %>%
+  # mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
+  #        step.p.value = p.adjust(step.p.value, "fdr")) %>%
   arrange(desc(abs(correlation))) %>% 
   select(-PC1)
 dam_biomarkers
@@ -502,25 +503,27 @@ dens_data <-
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
 dens_data2 <- 
-  dens_data %>% filter(lm.p.value <= 0.05)
+  dens_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
 
 dens_plot <-
   ggplot(dens_data, aes(x = density_end, y = log.RPA)) +
-  geom_point() +
+  geom_point(alpha = 0.5) +
   # add lm when significant
-  geom_smooth(method = "lm", se = FALSE, data = dens_data2, linetype = 5, color = "grey50") +
+  geom_smooth(method = "lm", se = FALSE, data = dens_data2, linetype = 5, size = 0.5, color = "black") +
   # add step when significant
   geom_segment(aes(x = 0,
                  xend = chngpt,
                  y = `(Intercept)`,
-                 yend = `(Intercept)`), color = "grey50") +
+                 yend = `(Intercept)`), color = "black") +
   geom_segment(aes(x = chngpt,
                    xend = 1.142857,
                    y = `(Intercept)`+`I(density_end>chngpt)`, 
-                   yend = `(Intercept)`+`I(density_end>chngpt)`), color = "grey50") +
+                   yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
   facet_wrap(~`Pretty Name`, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Leafhopper density (insects / young leaf)") +
-  theme_bw()
+  theme_bw() + 
+  geom_hline(aes(yintercept = log(1000/306997)), color = "red")
+
 dens_plot
 ```
 
@@ -547,26 +550,26 @@ dam_data <-
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
 dam_data2 <- 
-  dam_data %>% filter(lm.p.value <= 0.05)
+  dam_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
 
 dam_plot <-
   ggplot(dam_data, aes(x = twister_damage, y = log.RPA)) +
-  geom_point() +
+  geom_point(alpha = 0.5) +
   # add lm when significant
-  geom_smooth(method = "lm", se = FALSE, data = dam_data2, linetype = 5, color = "grey50") +
+  geom_smooth(method = "lm", se = FALSE, data = dam_data2, linetype = 5, size = 0.5, color = "black") +
   # add step when significant
   geom_segment(aes(x = min(gc_tidy$twister_damage),
                  xend = chngpt,
                  y = `(Intercept)`,
-                 yend = `(Intercept)`), color = "grey50") +
+                 yend = `(Intercept)`), color = "black") +
   geom_segment(aes(x = chngpt,
                    xend = max(gc_tidy$twister_damage),
                    y = `(Intercept)`+`I(twister_damage>chngpt)`, 
-                   yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "grey50") +
+                   yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "black") +
   facet_wrap(~`Pretty Name`, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Percent damage to focal leaf") +
   theme_bw()
-dam_plot
+dam_plot+ geom_hline(aes(yintercept = log(1000/306997)), color = "red")
 ```
 
 ```{r}

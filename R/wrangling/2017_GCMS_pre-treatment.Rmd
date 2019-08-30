@@ -255,11 +255,11 @@ gc_tidy.7 <-
   gc_tidy.6 %>%                             # Set RPA to a very small number...
   mutate(RPA = case_when(ND            ~ 500/IS, # if peaks were always not detected
                          Censor        ~ 500/IS, # or if their original areas were  < 1000
-                         RPA < 500/IS  ~ 500/IS, # or if their areas after background subtraction < 500
+                         RPA < 1000/IS  ~ 500/IS, # or if their areas after background subtraction < 1000
                          TRUE    ~ RPA),
          present = case_when(ND           ~ FALSE,
                              Censor       ~ FALSE,
-                             RPA <= 500/IS ~ FALSE,
+                             RPA <= 1000/IS ~ FALSE,
                              TRUE         ~ TRUE)) %>%
    mutate(QVal = ifelse(present, QVal, NA)) %>%
   select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, QVal, rt, ri, present)  
@@ -387,7 +387,7 @@ plot(pca.2, parLabVc = gc_wide$sample)#log transformed
 # plot(pca.1, parLabVc = gc_wide$sample) 
 ```
 
-Q8 and Q13 shows up as an outlier in untransformed data.
+Q8 and Q13 shows up as an outlier in untransformed data. (Q8 is **much** stronger outlier if I don't censor peaks after blank subtraction---i.e. only RPA <= 0 get replaced with 500/IS)
 
 I'm not going to remove this outlier.  I'm not convinved it's important to remove.
 
