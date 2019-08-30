@@ -181,15 +181,34 @@ data <- lc2017_2 %>% select(Caffeine:Theophylline)
 lc_biomarkers_2017 <-
   map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
   bind_cols(loads) %>%
-  mutate(p.adj = p.adjust(p.value, "fdr")) %>% 
-  filter(p.adj < 0.05) %>%
-  select(compound, loading, correlation = estimate, p.value, p.adj) %>% 
-  arrange(desc(abs(loading)))
+  filter(p.value < 0.05) %>%
+  select(compound, loading, correlation = estimate, p.value) %>% 
+  arrange(desc(abs(correlation)))
 lc_biomarkers_2017
 ```
 
 
 Top contributors: EGCG, Caffeine, Theobromine, ECG.  All negative relationship with mean % damage.
+
+Univariate measures
+
+```{r}
+lc_lm_2017 <-
+  left_join(lc_biomarkers_2017, lc2017_tidy) %>% 
+  group_by(compound) %>% 
+  nest() %>% 
+  mutate(lm = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, data = .x))) %>% 
+  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>%
+  unnest(lm.tidy, .preserve = c(data, lm)) %>% 
+  filter(term != "(Intercept)") %>% 
+  select(compound, slope = estimate, lm.p.value = p.value)
+```
+
+In all cases the linear model was a better fit than quadratic, so I'm just going with linear.
+
+```{r}
+full_join(lc_biomarkers_2017, lc_lm_2017)
+```
 
 ## Plots
 
@@ -201,7 +220,7 @@ lc_plotdata.2017 <-
 lc_plot.2017 <-
   ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg)) +
   geom_point() +
-  # geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(method = "lm", se = FALSE, data = lc_plotdata.2017 %>% filter(compound == "Epigallocatechin gallate"), color = "black", size = 0.5, linetype = 1) +
   facet_wrap(~compound, scales = "free_y") +
   theme_bw() +
   theme(legend.position = "none") +
