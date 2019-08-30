@@ -52,8 +52,7 @@ tp2018 <-
   tp2018 %>% 
   clean_names() %>% 
   full_join(damage2018, by = "sample") %>%
-  filter(sample != "J23") %>% 
-  select(-leaf_density) #identical to `density_end`
+  filter(sample != "J23")
 tp2018
 ```
 
@@ -127,7 +126,7 @@ Now, the polynomial model is the best and there is a marginally significant rela
 dam.2017.plot <-
   ggplot(tp2017, aes(x = mean_percent_damage, y = mg_g_gae)) +
   geom_point() +
-  geom_smooth(method = "lm", formula = "y ~ poly(x, 2)", se = FALSE) +
+  geom_smooth(method = "lm", formula = "y ~ poly(x, 2)", se = FALSE, color = "black", size = 0.5) +
   labs(x = "Mean % damaged leaf area",
        y = "Total polyphenols (mg/g GAE)",
        # caption = "Sample Q2 removed",
@@ -188,12 +187,13 @@ The null model wins. No effect of leafhopper density on total polyphenols for JG
 
 ```{r}
 dens.2018.plot <-
-  ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = cultivar)) +
+  ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
   geom_point() +
   labs(x = "Final leafhopper density (insects / shoot)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +
   scale_color_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
+  scale_shape_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
   theme_bw() 
 dens.2018.plot
 ```
@@ -220,12 +220,13 @@ The winning model is the null model
 
 ```{r}
 dam.2018.plot <-
-  ggplot(tp2018, aes(x = mean_percent_damage, y = mg_g_gae, color = cultivar)) +
+  ggplot(tp2018, aes(x = mean_percent_damage, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
   geom_point() +
   labs(x = "Mean % damaged leaf area",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +
   scale_color_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
+  scale_shape_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
   theme_bw() 
 dam.2018.plot
 ```
