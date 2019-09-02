@@ -337,7 +337,7 @@ gc_tidy.final %>%
   ggplot(aes(log(RPA))) + geom_histogram()
 ```
  
-```{r}
+```{r eval=FALSE}
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 
 test <-

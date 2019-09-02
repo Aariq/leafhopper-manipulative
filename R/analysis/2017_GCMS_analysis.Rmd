@@ -89,7 +89,8 @@ gc_wide.logscale <-
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>%
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
+  mutate_at(vars(-metavars), rm_attr) %>% 
+  filter(sample != "Q8") 
 
 gc_wide.zeroes <- 
   gc_wide.zeroes %>% 
@@ -97,7 +98,9 @@ gc_wide.zeroes <-
   mutate_at(vars(-metavars), rm_attr)
 
 #set up chemistry data for RDA
-chemdata <- gc_wide.logscale %>% select(-metavars) %>% as.data.frame()
+chemdata <- gc_wide.logscale %>% 
+  select(-metavars) %>%
+  as.data.frame()
 rownames(chemdata) <- gc_wide.logscale$sample
 ```
 
@@ -457,6 +460,8 @@ biomarker_tab1 <-
     step.p.value <= 0.05 & chngpt.lowerCI <= 0 ~ paste0(chngpt, "a"), 
     TRUE                                        ~ as.character(chngpt)
   ))
+
+gc_tidy %>% filter(sample == "Q1") %>% select(No., Compound) %>% filter(Compound %in% biomarker_tab$compound) %>% write_csv(here("comounds to check censoring.csv"))
 ```
 Select columns
 ```{r}
@@ -521,8 +526,8 @@ dens_plot <-
                    yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
   facet_wrap(~`Pretty Name`, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Leafhopper density (insects / young leaf)") +
-  theme_bw() + 
-  geom_hline(aes(yintercept = log(1000/306997)), color = "red")
+  theme_bw() #+ 
+  # geom_hline(aes(yintercept = log(1000/306997)), color = "red")
 
 dens_plot
 ```
@@ -545,7 +550,7 @@ dam_data <-
   slice(1:9) %>% 
   unnest(data) %>% 
   mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"),
-            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <= 0, NA, .)) %>% 
+            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <= 0, as.numeric(NA), .)) %>% 
   left_join(gc_tidy) %>% 
   mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
 
@@ -569,7 +574,7 @@ dam_plot <-
   facet_wrap(~`Pretty Name`, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Percent damage to focal leaf") +
   theme_bw()
-dam_plot+ geom_hline(aes(yintercept = log(1000/306997)), color = "red")
+dam_plot
 ```
 
 ```{r}
