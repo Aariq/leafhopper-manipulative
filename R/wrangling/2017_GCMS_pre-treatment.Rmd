@@ -38,7 +38,7 @@ mvn <- MVN::mvn
 # Workflow Overview
 
 1. Tag 0's as nondetects
-2. Tag 0<Area<1000 as censored
+2. ~~Tag 0<Area<1000 as censored~~
 3. Filter out known contaminants
 4. Calculate RPA
 5. Split data into samples and method blank
@@ -47,7 +47,7 @@ mvn <- MVN::mvn
 This will give you sample data with 0s and possibly negative values for RPA and flags for nondetects and peaks that should be censored.
 
 7. Remove compounds that are not found in more than 2 samples (at least 3 samples) with RPA > 0
-8. Set RPA for nondetects, censored, and all RPA <= 0  to 500/IS
+8. Set RPA for nondetects, censored, and all RPA <= 0  to 100/IS
 9. Check for and remove any obvious outliers
 10. Create wide dataframe
 
@@ -253,13 +253,13 @@ Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored
 ```{r}
 gc_tidy.7 <-
   gc_tidy.6 %>%                             # Set RPA to a very small number...
-  mutate(RPA = case_when(ND            ~ 500/IS, # if peaks were always not detected
-                         Censor        ~ 500/IS, # or if their original areas were  < 1000
-                         RPA < 1000/IS  ~ 500/IS, # or if their areas after background subtraction < 1000
+  mutate(RPA = case_when(ND            ~ 100/IS, # if peaks were always not detected
+                         # Censor        ~ 100/IS, # or if their original areas were  < 1000
+                         RPA <=0  ~ 100/IS, # or if their areas after background subtraction <= 0
                          TRUE    ~ RPA),
          present = case_when(ND           ~ FALSE,
-                             Censor       ~ FALSE,
-                             RPA <= 1000/IS ~ FALSE,
+                             # Censor       ~ FALSE,
+                             RPA <= 0 ~ FALSE,
                              TRUE         ~ TRUE)) %>%
    mutate(QVal = ifelse(present, QVal, NA)) %>%
   select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, QVal, rt, ri, present)  
