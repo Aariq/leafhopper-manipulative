@@ -31,7 +31,7 @@ library(chngpt)
 
 # Purpose
 
-What is the goal of this notebook?
+This is the main analysis of volatile data for the paper. Multivariate analysis with redundancy analysis (RDA).  I decided to go with RDA over PLSR because I like that it gives me the percentage of variation explained by the predictor variables (herbivory proxies) whereas PLSR just gives a R2 for the axis (how much variation in X and Y does the *axis* explain).  I then identify biomarkers as compounds with significant correlations to the first (only) RDA axis, and do some univariate tests on them to see if they best fit a null (intercept only), line, step function, or hinge and then plot the results and produce a table.
 
 # Load Data
 Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
@@ -44,7 +44,9 @@ gc_wide.zeroes <- read_rds(here("data", "cleaned", "2017_gcms_zeroes.rds"))
 
 ```{r}
 annotations <- read_excel(here("data", "cleaned", "Compound annotation updated.xlsx")) %>%
-  rename(compound = Compound)
+  rename(compound = Compound) %>% 
+  na_if("NA") %>% 
+  mutate(`Pretty Name` = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`))
 ```
 
 
@@ -120,8 +122,6 @@ length(unique(gc_tidy$Compound))
 
 ## How many compounds are found in all samples?
 
-Only 4!
-
 ```{r}
 gc_tidy %>% 
   group_by(Compound) %>% 
@@ -158,7 +158,6 @@ synt_dens <- MVA.synt(rda_dens)
 synt_dens[[1]]
 ```
 
-yeesh, only 9.12% explained by ending density
 
 ### ANOVA
 
@@ -184,7 +183,6 @@ rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
 synt_dam <- MVA.synt(rda_dam)
 synt_dam[[1]]
 ```
-Twister leaf damage explains 8% of variation in loged scaled volatiles. 
 
 ### ANOVA
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
@@ -193,7 +191,7 @@ Test for significance that this amount of explained variance is higher than the 
 anova(rda_dam)
 ```
 
-Marginally significant
+Marginally significant??
 
 
 ## Biomarkers
@@ -224,70 +222,6 @@ dens_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-#### Univariate regressions
-
-Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
-
-
-```{r}
-biom_data <-
-  gc_tidy %>% 
-  mutate(log.RPA = log(RPA)) %>% 
-  rename(compound = Compound)
-  
-dens_lm <- 
-  biom_data %>% 
-  group_by(compound) %>% 
-  nest() %>% 
-  mutate(lm = map(data, ~lm(log.RPA ~ density_end, data = .x))) %>% 
-  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>% 
-  unnest(lm.tidy, .preserve = lm) %>% 
-  filter(term != "(Intercept)") %>% 
-  select(-term) %>% 
-  select(compound, lm, lm.slope = estimate, lm.p.value = p.value)
-
-dens_lm
-```
-
-
-#### Step function
-
-Write my own function to get p-value and changepoint from chngpt.test and coefs from chngptm.  Man, this package sucks.
-
-```{r}
-mychngpt <- function(formula.1, formula.2, ...){
-
-  test <- chngpt.test(formula.1, formula.2, ...)
-  m <- chngptm(formula.1, formula.2, var.type = "bootstrap", ci.bootstrap.size = 100, ...)
-  m.summary <- summary(m)
-  tidydf <- 
-    coef(m) %>% 
-    enframe(name = "term") %>% 
-    spread(key = term, value = value) %>% 
-    add_column(p.value = test$p.value,
-               chngpt = m.summary$chngpt[1],
-               chngpt.lowerCI = m.summary$chngpt[2],
-               chngpt.upperCI = m.summary$chngpt[3])
-  return(tidydf)
-}
-```
-
-
-
-```{r}
-dens_step <-
-  biom_data %>% 
-  nest() %>% 
-  mutate(step = map(data,
-                    ~mychngpt(log.RPA ~ 1, ~ density_end,
-                              data = .x,
-                              type = "step",
-                              family = "gaussian",
-                              chngpts.cnt	= 50))) %>% 
-  unnest(step) %>% 
-  rename(step.p.value = p.value)
-```
-
 
 #### Join with loadings
 
@@ -295,14 +229,9 @@ I can save this one as a supplemental document later
 
 ```{r}
 dens_load_tbl <- 
-  full_join(dens_loads, dens_corr, by = "compound") %>%
-  full_join(dens_lm, by = "compound") %>% 
-  full_join(dens_step, by = "compound") %>% 
+  full_join(dens_loads, dens_corr, by = "compound") %>% 
 arrange(desc(abs(correlation)))
 dens_load_tbl
-```
-```{r}
-#TODO: save as supplemental
 ```
 
 #### Filter
@@ -320,6 +249,120 @@ dens_biomarkers <-
   arrange(desc(abs(correlation))) %>% 
   select(-PC1) %>% 
   mutate(compound = fct_inorder(compound))
+```
+
+#### Univariate regressions
+
+Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
+
+I'm going to fit a null (intercept only), linear, step, and hinge model to every compound and choose the winner with AIC.
+
+```{r}
+biom_data <-
+  gc_tidy %>% 
+  mutate(log.RPA = log(RPA)) %>% 
+  rename(compound = Compound) %>% 
+  filter(compound %in% dens_biomarkers$compound)
+```
+
+```{r}
+dens_univar <-
+  biom_data %>% 
+  group_by(compound) %>% 
+  nest() %>% 
+  mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
+         line = map(data, ~lm(log.RPA ~ density_end, data = .x)),
+         step = map(data, ~chngptm(log.RPA ~ 1, ~ density_end, family = "gaussian", type = "step", data = .x, var.type="bootstrap", ci.bootstrap.size=100)),
+         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ density_end, family = "gaussian", type = "hinge", data = .x))) %>% 
+  gather(-compound, -data, key = type, value = model) %>% 
+  mutate(fit = ifelse(type %in% c("null", "line"), model, map(model, ~.x$best.fit))) %>% 
+  arrange(compound) %>% 
+  mutate(AIC = map(fit, ~AIC(.x))) %>%
+  unnest(AIC)
+```
+Choose the best model.
+
+Null is the simplest (df = 0), folowed by line (df = 1), and step and hinge (df = 2).  I also want to ignore the step and hinge models if the confidence interval for the changepoint overlaps zero.  That indicates to me that a line or intercept only is a better fit.
+
+```{r}
+#note, this ONLY works when models are in order null, line, step, hinge
+bestAIC <- function(AIC){
+  if(any(AIC[1] >= AIC[2:4] + 2)){
+    if(any(AIC[2] >= AIC[3:4] + 2)){
+      return(min(AIC[3:4]))
+    } else {
+      return(AIC[2])
+    }
+  } else {
+    return(AIC[1])
+  }
+}
+```
+
+```{r}
+tidy.chngpt <- function(chngpt.mod) {
+  df <- bind_cols(
+    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
+    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
+  )
+  return(df)
+}
+```
+
+
+```{r}
+dens_univar_out <- 
+  dens_univar %>% 
+  filter(type %in% c("step", "hinge")) %>% 
+  mutate(coefs = map(model, tidy.chngpt)) %>% 
+  unnest(coefs) %>% 
+  select(-data, -model, -fit) %>% 
+  left_join(dens_univar, .) %>% 
+  #set AIC to very high if the threshold CI overlaps zero
+  mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
+  group_by(compound) %>%
+  # choose the best AIC as described above
+  filter(AIC == bestAIC(AIC))
+```
+
+
+#### Merge with loadings and correlations
+
+```{r}
+dens_plotdata <- 
+  full_join(dens_biomarkers, dens_univar_out, by = "compound") %>% 
+  full_join(annotations, by = "compound") %>% 
+  dplyr::slice(1:9) %>% 
+  left_join(biom_data, by = "compound") %>% 
+  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), mean, .desc = TRUE))
+
+#just linear models
+dens_justlm <- dens_plotdata %>% filter(type == "line")
+```
+
+```{r}
+ggplot(dens_plotdata, aes(x = density_end, y = log.RPA)) +
+  geom_point() +
+  geom_segment(aes(x = 0,
+                 xend = chngpt,
+                 y = `(Intercept)`,
+                 yend = `(Intercept)`), color = "black") +
+  #step
+  geom_segment(aes(x = chngpt,
+                   xend = 1,
+                   y = `(Intercept)`+`I(density_end>chngpt)`, 
+                   yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
+  #hinge
+  geom_segment(aes(x = chngpt,
+                   xend = 1,
+                   y = `(Intercept)`,
+                   yend = `(Intercept)` * `(density_end-chngpt)+`)) +
+  #line
+  geom_smooth(method = "lm",se = FALSE, color = "black", data = dens_justlm) +
+  facet_wrap(~`Pretty Name`, scales = "free_y") +
+  labs(x = "Leafhopper density (insects / leaf)",
+       y = "ln(relative peak area)")
+  
 ```
 
 
