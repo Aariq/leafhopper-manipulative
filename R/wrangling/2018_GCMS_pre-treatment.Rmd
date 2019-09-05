@@ -35,7 +35,7 @@ mvn <- MVN::mvn
 # Workflow Overview
 
 1. Tag 0's as nondetects
-2. Tag 0<Area<1000 as censored
+2. ~~Tag 0<Area<1000 as censored~~
 3. Filter out known contaminants
 4. Calculate RPA
 5. Split data into samples and method blank
@@ -145,8 +145,7 @@ gc_tidy <-
 ```{r}
 gc_tidy <-
   gc_tidy %>%
-  mutate(ND = area == 0,
-         Censor = area > 0 & area < 1000)
+  mutate(ND = area == 0)
 ```
 
 
@@ -170,7 +169,6 @@ contaminants <- c("Propanoic acid, 2-methyl-, 1-(1,1-dimethylethyl)-2-methyl-1,3
                   "Benzaldehyde, 2,6-dichloro-",
                   "141")
 
-# gc_tidy %>% filter(Compound %in% contaminants) %>% count(filename)
 gc_tidy.1 <-
   gc_tidy %>%
   filter(!Compound %in% contaminants) %>%
@@ -191,20 +189,9 @@ gc_IS <-
   rename(IS = area) %>% 
   select(filename, cultivar, IS)
 
-gc_IS %>% filter(IS < 100000)
+weirdos <- gc_IS %>% filter(IS < 100000)
 # JGY 11 and JGY 4
 
-# JGY_IS_MEAN <- 
-#   gc_IS %>%
-#   filter(IS > 100000, cultivar == "J") %>%
-#   pull(IS) %>%
-#   mean()
-
-# Replace bad IS areas with mean for cultivar.
-# gc_IS <- 
-#   gc_IS %>%
-#   group_by(cultivar) %>%
-#   mutate(IS = ifelse(IS < 100000, JGY_IS_MEAN, IS))
 
 #join with gc.tidy and mutate to calculate RPA
 gc_tidy.2 <- full_join(gc_tidy.1, gc_IS)
@@ -213,8 +200,7 @@ gc_tidy.2 <- gc_tidy.2 %>%
   #don't need Naphtalene-D8 anymore
   filter(Compound != "Naphthalene-D8") %>% 
   #remove weird samples
-  filter(!filename %in% c("081618_JinGuanYin_Bag11", "081618_JinGuanYin_Bag4"))
-# gc_tidy.2 %>% filter(str_detect(filename, "Jin")) %>% count(filename)
+  filter(!filename %in% weirdos$filename)
 ```
 
 # Field blank subtraction
@@ -267,9 +253,7 @@ gc_tidy.6 <-
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
-Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  There may be other RPA values <= 0 due to subtracting the method blank.
-
-I'll set all zeroes to 500/IS.  This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
+Nondetects were zeros to begin with, not found by IonAnalytics at all.  I'm not censoring peaks. However, if RPA <=0 because of non-detect or blank-subtraction, I'll set RPA to a small number (100/IS). This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
 
 
 Also set Q-values of compounds not found to NA
@@ -277,12 +261,10 @@ Also set Q-values of compounds not found to NA
 ```{r}
 gc_tidy.7 <-
   gc_tidy.6 %>%
-  mutate(RPA = case_when(ND           ~ 500/IS,
-                         Censor       ~ 500/IS,
-                         RPA <=500/IS ~ 500/IS, #if after background subtraction peak areas < 500
-                         TRUE    ~ RPA),
+  mutate(RPA = case_when(ND       ~ 100/IS,
+                         RPA <= 0 ~ 100/IS, #if after background subtraction peak areas < 500
+                         TRUE     ~ RPA),
          present = case_when(ND      ~ FALSE,
-                             Censor  ~ FALSE,
                              RPA <=0 ~ FALSE,
                              TRUE    ~ TRUE)) %>%
   mutate(QVal = ifelse(present, QVal, NA)) %>% 
@@ -304,7 +286,7 @@ gc_zeroes <-
 
 # Remove rare peaks
 
-Remove compounds that are found in 5 or fewer samples.
+Remove compounds that are found in **5 or fewer** samples.
 
 ```{r}
 gc_tidy.final <-
@@ -369,7 +351,6 @@ This may change once the data is finalized.
 
 ```{r}
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
-
 ```
  
 ```{r eval=FALSE}
@@ -400,7 +381,7 @@ gc_wide[out, ]
 out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
 gc_wide[out2, ]
 ```
-L15 and L21 detected as outliers in log-transformed data only, and at alpha = 0.1, not alpha = 0.05
+No outliers detected
 
 ## With PCA
 
@@ -409,9 +390,7 @@ pca <- opls(select(gc_wide, -metavars)%>% mutate_all(log) , plotL = FALSE, predI
 plot(pca, parLabVc = gc_wide$sample)
 ```
 
-L15 is maybe an extreme value, but not worth removing.
-
-
+L15 and J16 are maybe an extreme values, but not worth removing.
 
 # Write to file
 

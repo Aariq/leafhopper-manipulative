@@ -19,21 +19,26 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r packages, include=FALSE}
 library(tidyverse)
 library(here)
+library(readxl)
 #for RDA:
 library(vegan)
 library(RVAideMemoire)
+#for figures:
+library(cowplot)
+#for step and hinge models
+library(chngpt)
 ```
 
 # Purpose
 
-What is the goal of this notebook?
+This is the main analysis of volatile data for the paper. Multivariate analysis with redundancy analysis (RDA).  I decided to go with RDA over PLSR because I like that it gives me the percentage of variation explained by the predictor variables (herbivory proxies) whereas PLSR just gives a R2 for the axis (how much variation in X and Y does the *axis* explain).  I then identify biomarkers as compounds with significant correlations to the first (only) RDA axis, and do some univariate tests on them to see if they best fit a null (intercept only), line, step function, or hinge and then plot the results and produce a table.
 
 # Load Data
 Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
 ```{r data, echo=TRUE}
 gc_wide <- read_rds(here("data", "cleaned", "2018_gcms_wide.rds"))
 gc_tidy <- read_rds(here("data", "cleaned", "2018_gcms_tidy.rds"))
-gc_wide.zeroes <- read_rds(here("data", "cleaned", "2018_gcms_zeroes.rds"))
+# gc_wide.zeroes <- read_rds(here("data", "cleaned", "2018_gcms_zeroes.rds"))
 ```
 
 ## Data Dictionary
@@ -55,19 +60,46 @@ gc_wide.zeroes <- read_rds(here("data", "cleaned", "2018_gcms_zeroes.rds"))
 
 `gc_wide`: A wide version with columns for each `Compound` with `RPA` as the value
 
-
-# Data pre-treatment
-I'm going to log-transform and scale the wide data
+# Load Functions
+Custom functions needed for analysis:
 
 ```{r}
 #attribute stripper function
 rm_attr <- function(x){
   attributes(x) <- NULL
   return(x)
+}
+
+#Model chooser
+#note, this ONLY works when models are in order null, line, step, hinge
+bestAIC <- function(AIC){
+  if(any(AIC[1] >= AIC[2:4] + 2)){
+    if(any(AIC[2] >= AIC[3:4] + 2)){
+      return(min(AIC[3:4]))
+    } else {
+      return(AIC[2])
+    }
+  } else {
+    return(AIC[1])
   }
+}
 
+
+#Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
+tidy.chngpt <- function(chngpt.mod) {
+  df <- bind_cols(
+    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
+    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
+  )
+  return(df)
+}
+```
+
+# Data pre-treatment
+I'm going to log-transform and scale the wide data
+
+```{r}
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
-
 ```
  
 ```{r}

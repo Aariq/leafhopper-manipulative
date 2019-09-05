@@ -123,13 +123,12 @@ gc_tidy <-
 
 
 
-# Tag non-detects and to-be-censored
+# Tag non-detects
 
 ```{r message=FALSE, warning=FALSE}
 gc_tidy <-
   gc_tidy %>%
-  mutate(ND = area == 0,
-         Censor = area > 0 & area < 1000)
+  mutate(ND = area == 0)
 ```
 
 # Remove known contaminants and problematic peaks
@@ -248,19 +247,17 @@ gc_tidy.6 <-
 
 # Deal with non-detects, censored peaks, and other zeros and negative values
 
-Nondetects were zeros to begin with, not found by IonAnalytics at all.  Censored peaks are those with peak area < 1000.  According to the Robbat lab, areas < 1000 are not accurate due to being below the LOD.  There are multiple options for dealing with this, but they usually set those peaks to zero.  I'll set them all to a small number (500/IS).  This will be useful for log-transforming data since log(0) = -inf.
+Nondetects were zeros to begin with, not found by IonAnalytics at all.  I'm not censoring peaks. However, if RPA <=0 because of non-detect or blank-subtraction, I'll set RPA to a small number (100/IS). This will be useful for log-transforming data since log(0) = -inf. I also add a "present" column that will be useful for getting compound counts and such later on.
 
 ```{r}
 gc_tidy.7 <-
   gc_tidy.6 %>%                             # Set RPA to a very small number...
-  mutate(RPA = case_when(ND            ~ 100/IS, # if peaks were always not detected
-                         # Censor        ~ 100/IS, # or if their original areas were  < 1000
-                         RPA <=0  ~ 100/IS, # or if their areas after background subtraction <= 0
+  mutate(RPA = case_when(ND      ~ 100/IS, # if peaks were always not detected
+                         RPA <=0 ~ 100/IS, # or if their areas after background subtraction <= 0
                          TRUE    ~ RPA),
-         present = case_when(ND           ~ FALSE,
-                             # Censor       ~ FALSE,
+         present = case_when(ND       ~ FALSE,
                              RPA <= 0 ~ FALSE,
-                             TRUE         ~ TRUE)) %>%
+                             TRUE     ~ TRUE)) %>%
    mutate(QVal = ifelse(present, QVal, NA)) %>%
   select(sample, cultivar, density_start, density_end, mean_percent_damage, twister_damage, No., Compound, CAS, RPA, QVal, rt, ri, present)  
 
@@ -336,10 +333,11 @@ gc_tidy.final %>%
 gc_tidy.final %>% 
   ggplot(aes(log(RPA))) + geom_histogram()
 ```
+```{r}
+metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
+```
  
 ```{r eval=FALSE}
-metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
-
 test <-
   gc_tidy.final %>%
   ungroup() %>% 
@@ -369,7 +367,7 @@ out2 <- HDoutliers(select(gc_wide, -metavars) %>% mutate_all(log), alpha = 0.1)
 gc_wide[out2, ]
 ```
 
-No outliers detected
+Q8 is possible outlier
 
 
 ## With PCA
@@ -387,10 +385,7 @@ plot(pca.2, parLabVc = gc_wide$sample)#log transformed
 # plot(pca.1, parLabVc = gc_wide$sample) 
 ```
 
-Q8 and Q13 shows up as an outlier in untransformed data. (Q8 is **much** stronger outlier if I don't censor peaks after blank subtraction---i.e. only RPA <= 0 get replaced with 500/IS)
-
-I'm not going to remove this outlier.  I'm not convinved it's important to remove.
-
+Q8 is a pretty strong outlier.
 
 # Write to file
 

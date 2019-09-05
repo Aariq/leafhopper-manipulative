@@ -39,7 +39,6 @@ Read in cleaned GCMS data (which includes leafhopper density already) and leafho
 ```{r data, echo=TRUE}
 gc_wide <- read_rds(here("data", "cleaned", "2017_gcms_wide.rds"))
 gc_tidy <- read_rds(here("data", "cleaned", "2017_gcms_tidy.rds"))
-# gc_wide.zeroes <- read_rds(here("data", "cleaned", "2017_gcms_zeroes.rds"))
 ```
 
 ```{r}
@@ -128,11 +127,6 @@ gc_tidy <-
   gc_tidy %>%
   rename(compound = Compound) %>% 
   filter(sample != "Q8")
-
-# gc_wide.zeroes <- 
-#   gc_wide.zeroes %>% 
-#   mutate_at(vars(-metavars), scale) %>% 
-#   mutate_at(vars(-metavars), rm_attr)
 
 #set up chemistry data for RDA
 chemdata <-
