@@ -37,8 +37,14 @@ This is the main analysis of volatile data for the paper. Multivariate analysis 
 Read in cleaned GCMS data (which includes leafhopper density already) and leafhopper damage data (from image analysis)
 ```{r data, echo=TRUE}
 gc_wide <- read_rds(here("data", "cleaned", "2018_gcms_wide.rds"))
-gc_tidy <- read_rds(here("data", "cleaned", "2018_gcms_tidy.rds"))
+gc_tidy <- read_rds(here("data", "cleaned", "2018_gcms_tidy.rds")) %>% rename(compound = Compound)
 # gc_wide.zeroes <- read_rds(here("data", "cleaned", "2018_gcms_zeroes.rds"))
+```
+
+```{r}
+annotations.raw <- 
+  read_excel(here("data", "cleaned", "Compound annotation updated.xlsx"), na = "NA") %>%
+  janitor::clean_names()
 ```
 
 ## Data Dictionary
@@ -109,26 +115,14 @@ gc_wide.logscale <-
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
   mutate_at(vars(-metavars), rm_attr)
-
-gc_wide.zeroes <-
-  gc_wide.zeroes %>% 
-  mutate_at(vars(-metavars), scale) %>% 
-  #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
 ```
-
-```{r}
-ggplot(gc_wide.logscale, aes(log(mean_percent_damage)))+ geom_histogram(bins = 10)
-```
-I might want to log-transofrm the percent damage data.
-
 
 
 # Analysis
 # Descriptive statistics
 1. How many compounds?
 ```{r}
-gc_tidy %>% group_by(sample) %>% tally()
+length(unique(gc_tidy$compound))
 ```
 2. How many in Long Jing, how many in JGY?
 ```{r}
@@ -146,96 +140,27 @@ gc_tidy %>%
 
 3. How many found in **all** JGY or **all** LJ samples?
 ```{r}
-gc_tidy %>% 
+jgy_common <- 
+  gc_tidy %>% 
   filter(cultivar == "J") %>% #count() #22 samples total
   summarize(nsamp = sum(present)) %>% 
   filter(nsamp == 20)
+nrow(jgy_common)
+# jgy_common
+```
 
-gc_tidy %>% 
+```{r}
+lj_common <- 
+  gc_tidy %>% 
   filter(cultivar == "L") %>% #count() #19 samples total
   summarize(nsamp = sum(present)) %>% 
   filter(nsamp == 19)
+nrow(lj_common)
+# lj_common
 ```
 
-
-## RDA for density
-1. Fit RDA model
-
-```{r}
-#using ending density
-rda_dens <- 
-  rda(gc_wide.logscale %>% select(-metavars) ~ density_end*cultivar,
-      data = gc_wide.logscale)
-#distance based on unscaled, untransformed data.
-dbrda_dens <-
-  dbrda(gc_wide.zeroes %>% select(-metavars) ~ density_end,
-      data = gc_wide.zeroes)
-```
- 
-```{r}
-#using mean percent damage
-rda_dam <- 
-  rda(gc_wide.logscale %>% select(-metavars) ~ (mean_percent_damage)*cultivar,
-      data = gc_wide.logscale)
-
-#using twister leaf
-gc_wide.t <- gc_wide.logscale %>% filter(!is.na(twister_damage))
-rda_t <-
-  rda(gc_wide.t %>% select(-metavars) ~ (twister_damage)*cultivar,
-      data = gc_wide.t)
-```
-
-2. How much total variance does the experimental design explain?
-
-```{r}
-MVA.synt(rda_dens)
-MVA.synt(rda_dam)
-MVA.synt(rda_t)
-```
-Density*cultivar explains 75.97% of variation
-Damage*cultivar explains 76.37% of variation
-Twister leaf damage*cultivar explains 71.73% of variation (less data here)
-
-3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
-
-```{r}
-anova(rda_dam)
-anova(rda_dens)
-anova(rda_t)
-```
-
-all are highly significant
-
-4. Then we test for significance of individual factors and interaction terms:
-
-```{r}
-MVA.anova(rda_dam)
-MVA.anova(rda_dens)
-MVA.anova(rda_t)
-```
-
-Yup, only effect of cultivar `r emo::ji("sob")`
-
-```{r}
-rda_cultivar <- rda(gc_wide.logscale %>% select(-metavars) ~ cultivar,
-      data = gc_wide.logscale)
-MVA.synt(rda_cultivar)
-anova(rda_cultivar)
-MVA.anova(rda_cultivar)
-```
-
-```{r}
-loads <- MVA.load(rda_cultivar)$loads %>% rename(loading = `Constr. comp. 1`)
-
-MVA.plot(rda_cultivar, fac = gc_wide.logscale$cultivar)
-
-```
-
-positive loading means greater concentration in J. negative loading means greater concentration in L.
-
-# Splitting by cultivar
-
-I don't really believe that ALL compounds were in higher concentration in one cultivar.  Seems like differences in sampling/running on GCMS.  Let's split the cultivars and run separate RDAs.
+# Analysis
+Because the effect of cultivar is confounded by the time of the experiment, and because preliminary analysis showed there were highly significant differences between cultivars, analysis procedes with cultivars separated.  Additionally, the peak areas of the internal standard are an order of magnitude different between cultivars.
 
 I need to split them *before* scaling!
 
@@ -262,7 +187,6 @@ gc_lj <-
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
   mutate_at(vars(-metavars), rm_attr)
-
 gc_lj.t <- 
   gc_wide %>% 
   filter(cultivar == "L") %>% 
@@ -273,38 +197,96 @@ gc_lj.t <-
   mutate_at(vars(-metavars), rm_attr)
 ```
 
+## Jin Guan Yin
+### Fit RDAs
+fit RDAs using leafhopper density, mean leaf damage, and twister leaf damage (using subset of samples with twister leaf data)
 ```{r}
 rda_jgy_dens <- 
   rda(gc_jgy %>% select(-metavars) ~ density_end,
       data = gc_jgy)
-anova(rda_jgy_dens)
 
 rda_jgy_dam <-
   rda(gc_jgy %>% select(-metavars) ~ mean_percent_damage,
       data = gc_jgy)
-anova(rda_jgy_dam)
 
 rda_jgy_t <- 
   rda(gc_jgy.t %>% select(-metavars) ~ twister_damage,
       data = gc_jgy.t)
+```
+
+### Variance Explained
+```{r}
+MVA.synt(rda_jgy_dens)[[1]][[2]]
+```
+```{r}
+MVA.synt(rda_jgy_dam)[[1]][[2]]
+```
+```{r}
+MVA.synt(rda_jgy_t)[[1]][[2]]
+```
+
+All proxies of herbivory explain < 7% of variation in volatiles
+
+### Anovas
+
+```{r}
+anova(rda_jgy_dens)
+```
+
+```{r}
+anova(rda_jgy_dam)
+```
+
+```{r}
 anova(rda_jgy_t)
 ```
+
+All non-significant
+
+## Long Jing
+### Fit RDAs for Long Jing
 
 ```{r}
 rda_lj_dens <-
   rda(gc_lj %>% select(-metavars) ~ density_end,
       data = gc_lj)
-anova(rda_lj_dens)
 
 rda_lj_dam <-
   rda(gc_lj %>% select(-metavars) ~ mean_percent_damage,
       data = gc_lj)
-anova(rda_lj_dam)
 
 rda_lj_t <-
   rda(gc_lj.t %>% select(-metavars) ~ mean_percent_damage,
       data = gc_lj.t)
+```
+
+### Variance explained
+
+```{r}
+MVA.synt(rda_lj_dens)[[1]][[2]]
+```
+
+```{r}
+MVA.synt(rda_lj_dam)[[1]][[2]]
+```
+
+```{r}
+MVA.synt(rda_lj_t)[[1]][[2]]
+```
+
+Twister leaf damage explains the most variation, but this is also a very small subset of the data (only 7 samples)
+
+### ANOVAs
+```{r}
+anova(rda_lj_dens)
+```
+
+```{r}
+anova(rda_lj_dam)
+```
+
+```{r}
 anova(rda_lj_t)
 ```
 
-
+None are significant
