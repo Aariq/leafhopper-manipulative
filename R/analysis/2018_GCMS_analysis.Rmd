@@ -128,12 +128,12 @@ length(unique(gc_tidy$compound))
 ```{r}
 gc_tidy %>%
   filter(cultivar == "J") %>% 
-  group_by(Compound) %>% #for each compound...
+  group_by(compound) %>% #for each compound...
   filter(sum(present) > 0) %>% group_by(sample) %>% tally()
 
 gc_tidy %>% 
   filter(cultivar == "L") %>% 
-  group_by(Compound) %>% 
+  group_by(compound) %>% 
   filter(sum(present) > 0) %>%
   group_by(sample) %>% tally()
 ```
