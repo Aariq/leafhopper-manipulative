@@ -559,13 +559,12 @@ Rather than plotting all of the biomarkers, I'll choose some representatives tha
 
 ## Density Biomarkers
 
-
 ```{r}
 dens_plotdata <- 
   full_join(dens_biomarkers, dens_univar2, by = "compound") %>% 
-  # full_join(annotations, by = "compound") %>% 
+  left_join(annotations, by = "compound") %>%
   dplyr::slice(1:9) %>% 
-  left_join(biom_data, by = "compound") %>% 
+  left_join(dens_biom_data, by = "compound") %>% 
   mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE))
 
 #just linear models
@@ -599,44 +598,6 @@ dens_plot <-
 dens_plot
 ```
 
-OLD:
-```{r}
-# dens_data <- gc_tidy %>% filter(Compound %in% pull(dens_biomarkers, compound))
-
-dens_data <-
-  dens_biomarkers %>%
-  #take top 9 biomarkers
-  slice(1:9) %>% 
-  unnest(data) %>% 
-  mutate_at(vars("(Intercept)", "I(density_end>chngpt)", "chngpt"),
-            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <=0, NA, .)) %>% 
-  left_join(gc_tidy) %>% 
-  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), .desc = TRUE))
-
-dens_data2 <- 
-  dens_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
-
-dens_plot <-
-  ggplot(dens_data, aes(x = density_end, y = log.RPA)) +
-  geom_point(alpha = 0.5) +
-  # add lm when significant
-  geom_smooth(method = "lm", se = FALSE, data = dens_data2, linetype = 5, size = 0.5, color = "black") +
-  # add step when significant
-  geom_segment(aes(x = 0,
-                 xend = chngpt,
-                 y = `(Intercept)`,
-                 yend = `(Intercept)`), color = "black") +
-  geom_segment(aes(x = chngpt,
-                   xend = 1.142857,
-                   y = `(Intercept)`+`I(density_end>chngpt)`, 
-                   yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
-  facet_wrap(~pretty_name, scales = "free_y") +
-  labs(y = "ln(Relative peak area)", x = "Leafhopper density (insects / young leaf)") +
-  theme_bw() #+ 
-  # geom_hline(aes(yintercept = log(1000/306997)), color = "red")
-
-dens_plot
-```
 
 ```{r}
 save_plot(here("figs", "density-biomarkers.png"), dens_plot,
@@ -650,38 +611,44 @@ save_plot(here("figs", "density-biomarkers.png"), dens_plot,
 ## Damage biomarkers
 
 ```{r}
-dam_data <-
-  dam_biomarkers %>% 
-  #take top 9 for plotting
-  slice(1:9) %>% 
-  unnest(data) %>% 
-  mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"),
-            ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <= 0, as.numeric(NA), .)) %>% 
-  left_join(gc_tidy) %>% 
-  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), .desc = TRUE))
+dam_plotdata <- 
+  full_join(dam_biomarkers, dam_univar2, by = "compound") %>% 
+  left_join(annotations, by = "compound") %>%
+  dplyr::slice(1:9) %>% 
+  left_join(dam_biom_data, by = "compound") %>% 
+  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE))
 
-dam_data2 <- 
-  dam_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
+#just linear models
+dam_justlm <- dam_plotdata %>% filter(type == "line")
+```
 
-dam_plot <-
-  ggplot(dam_data, aes(x = twister_damage, y = log.RPA)) +
+```{r}
+dam_plot <- 
+  ggplot(dam_plotdata, aes(x = twister_damage, y = log.RPA)) +
   geom_point(alpha = 0.5) +
-  # add lm when significant
-  geom_smooth(method = "lm", se = FALSE, data = dam_data2, linetype = 5, size = 0.5, color = "black") +
-  # add step when significant
-  geom_segment(aes(x = min(gc_tidy$twister_damage),
+  geom_segment(aes(x = 0,
                  xend = chngpt,
                  y = `(Intercept)`,
                  yend = `(Intercept)`), color = "black") +
+  #step
   geom_segment(aes(x = chngpt,
                    xend = max(gc_tidy$twister_damage),
                    y = `(Intercept)`+`I(twister_damage>chngpt)`, 
                    yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "black") +
+  #hinge
+  geom_segment(aes(x = chngpt,
+                   xend = max(gc_tidy$twister_damage),
+                   y = `(Intercept)`,
+                   yend = `(Intercept)` * `(twister_damage-chngpt)+`)) +
+  #line
+  geom_smooth(method = "lm", se = FALSE, color = "black", data = dam_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +
-  labs(y = "ln(Relative peak area)", x = "Percent damage to focal leaf") +
+  labs(x = "% damage to focal leaf",
+       y = "ln(relative peak area)") +
   theme_bw()
 dam_plot
 ```
+
 
 ```{r}
 save_plot(here("figs", "damage-biomarkers.png"), dam_plot,
