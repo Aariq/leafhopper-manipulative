@@ -1,0 +1,26 @@
+﻿Compound,CAS,RDA Loading,Correlation,Response type,Response estimate,Change point,Chemical Family,Aroma
+1-Hexanol,111-27-3,0.2,0.801***,line,0.166,-,Aliphatic alcohol,"resin, flower, green"
+(3Z)-Hexenyl hexanoate,31501-11-8,0.175,0.768***,line,0.15,-,Fatty acid ester,"fruit, prune"
+cis-3-Hexenyl isovalerate,35154-45-1,0.199,0.727***,step,10.545,8.541,Fatty acid ester,"fresh, green, apple, fruity, tropical, pineapple, dirty"
+(Z)-2-Hexenol,928-94-9,0.175,0.663**,line,0.138,-,Alkenyl alcohol,"leaf, green, wine, fruit"
+Coumaran,496-16-2,0.162,0.651**,hinge,0.167,8.541,Heterocyclic compound,-
+"cis-Butyric acid, 3-hexenyl ester",16491-36-4,0.155,0.645**,line,0.134,-,Fatty acid ester,"wine, green"
+ɣ-Nonalactone,104-61-0,0.145,0.629**,line,0.089,-,Heterocyclic compound,"coconut, creamy, waxy, sweet, buttery, oily"
+Benzyl alcohol,100-51-6,0.15,0.625**,step,7.916,2.4,Cyclic alcohol,"fruity, floral, sweet"
+Methyl salicylate,119-36-8,0.176,0.62**,line,0.073,-,Heterocyclic compound,wintergreen
+Benzothiazole,95-16-9,0.149,0.617**,line,0.077,-,Nitrogen sulfur containing,"rubbery, sulfury, vegetal, gasoline"
+Phenethyl alcohol,60-12-8,0.172,0.6**,line,0.147,-,Aromatic alcohol,"honey, spice, rose, lilac"
+Isopropyl tetradecanoate,110-27-0,0.113,0.594**,line,0.02,-,Ester,"fatty, oily"
+"(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,0.124,0.59**,null,-,-,Aliphatic ester,-
+"10,18-Bisnorabieta-8,11,13-triene",32624-67-2,0.222,0.584*,line,0.06,-,Hydrocarbon,-
+Isovaleric acid,503-74-2,-0.118,-0.564*,step,2.867,4.206,Acid,"sour, cheesy, rancid"
+cis-Methyl dihydrojasmonate,39647-11-5,-0.185,-0.553*,line,-0.105,-,Cyclic ester,"jasmine, floral, green"
+"N,N-Dibutylformamide",761-65-9,0.106,0.533*,null,-,-,Nitrogen containing,-
+Diendiol I,13741-21-4,0.144,0.527*,line,0.116,-,Oxygenated monoterpene,-
+Benzoic acid,65-85-0,0.06,0.5*,null,-,-,Acid,"balsam, faint, urine"
+Phenylacetaldehyde,122-78-1,0.125,0.488*,null,-,-,Cyclic aldehyde,"floral, honey, sweet"
+Mesityl oxide,141-79-7,0.06,0.481*,null,-,-,Aliphatic ketone,"acrylic, earthy, sweet, chemical"
+Ethyl benzoate,93-89-0,0.087,0.48*,null,-,-,Cyclic ester,"sweet, wintergreen, fruity, medicinal"
+o-Hydroxybiphenyl,90-43-7,0.093,0.476*,null,-,-,Aromatic compound,-
+Decanoic acid,334-48-5,0.147,0.474*,line,0.15,-,Acid,"fatty, sour, rancid"
+cis-Linalool oxide (pyranoid),14009-71-3,0.109,0.472*,null,-,-,Oxygenated monoterpene,"citrus, green"

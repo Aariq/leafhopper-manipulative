@@ -43,11 +43,10 @@ gc_tidy <- read_rds(here("data", "cleaned", "2017_gcms_tidy.rds"))
 ```
 
 ```{r}
-annotations <- 
+annotations.raw <- 
   read_excel(here("data", "cleaned", "Compound annotation updated.xlsx"), na = "NA") %>%
-  rename(compound = Compound)
+  janitor::clean_names()
 ```
-
 
 
 ## Data Dictionary
@@ -69,17 +68,46 @@ annotations <-
 
 `gc_wide`: A wide version with columns for each `Compound` with `RPA` as the value
 
-
-# Data pre-treatment
-Most data pre-treatment was done in the wrangling Rmd. I already determine that log transformation followed by scaling is probably a good idea to improve normality.  However, the data is still zero-inflated, so it might be better to just use a distance based approach instead, which I think is "nonparametric".  Maybe it doesnt' really matter though since the permuation test for the RDA is nonparametric anyway.
+# Load Functions
+Custom functions needed for analysis:
 
 ```{r}
 #attribute stripper function
 rm_attr <- function(x){
   attributes(x) <- NULL
   return(x)
-  }
+}
 
+#Model chooser
+#note, this ONLY works when models are in order null, line, step, hinge
+bestAIC <- function(AIC){
+  if(any(AIC[1] >= AIC[2:4] + 2)){
+    if(any(AIC[2] >= AIC[3:4] + 2)){
+      return(min(AIC[3:4]))
+    } else {
+      return(AIC[2])
+    }
+  } else {
+    return(AIC[1])
+  }
+}
+
+
+#Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
+tidy.chngpt <- function(chngpt.mod) {
+  df <- bind_cols(
+    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
+    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
+  )
+  return(df)
+}
+```
+
+
+# Data pre-treatment
+Most data pre-treatment was done in the wrangling Rmd. I already determine that log transformation followed by scaling is probably a good idea to improve normality.  However, the data is still zero-inflated, so it might be better to just use a distance based approach instead, which I think is "nonparametric".  Maybe it doesnt' really matter though since the permuation test for the RDA is nonparametric anyway.
+
+```{r}
 #columns that aren't compound RPAs
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 ```
@@ -96,7 +124,11 @@ gc_wide.logscale <-
   #remove outlier found in wrangling script.
   filter(sample != "Q8")
 
-gc_tidy <- gc_tidy %>% filter(sample != "Q8")
+gc_tidy <-
+  gc_tidy %>%
+  rename(compound = Compound) %>% 
+  filter(sample != "Q8")
+
 # gc_wide.zeroes <- 
 #   gc_wide.zeroes %>% 
 #   mutate_at(vars(-metavars), scale) %>% 
@@ -121,12 +153,32 @@ length(unique(gc_tidy$Compound))
 
 ```{r}
 gc_tidy %>% 
-  group_by(Compound) %>% 
+  group_by(compound) %>% 
   summarize(nsample = sum(present)) %>% 
-  filter(nsample > 17) %>% 
-  rename(compound = Compound) %>%
-  left_join(annotations)
+  filter(nsample > 17) 
 ```
+
+## Summary table
+Create a summary table and join with annotations, rename unknowns in order by retention index
+
+```{r}
+meanRIs <- gc_tidy %>% 
+  group_by(compound) %>% 
+  summarize(meanRI = mean(ri, na.rm = TRUE))
+
+annotations2 <- left_join(meanRIs, annotations.raw, by = "compound")
+  
+unks <- annotations2 %>% filter(is.na(cas)) %>% arrange(meanRI) %>% add_column(unk_name = 1:nrow(.))
+
+annotations <- 
+  left_join(annotations2, unks) %>% 
+  mutate(pretty_name = ifelse(is.na(unk_name), pretty_name, unk_name)) %>% 
+  mutate(pretty_name = ifelse(is.na(pretty_name), compound, pretty_name)) %>% 
+  select(compound, cas, pretty_name, meanRI, ri_lab, ri_lit, source, aroma, chemical_family) %>% 
+  mutate(chemical_family = snakecase::to_sentence_case(chemical_family))
+```
+
+
 
 # Analysis
 ## RDA for density
@@ -208,13 +260,13 @@ anova(rda_dam)
 Marginally significant? Not sure if should report biomarkers.
 
 
-## Biomarkers
+# Biomarkers
 
 I'm defining biomarkers as compounds that are significantly correlated to the RDA axis (correlation between axis scores and chemistry data).
 
-### leafhopper density biomarkers
+## leafhopper density biomarkers
 
-#### Extract scores and loadings
+### Extract scores and loadings
 
 ```{r}
 dens_scores <-
@@ -225,7 +277,7 @@ dens_loads <- scores(rda_dens, display = "species", scaling = 0) %>%
   as_tibble(rownames = "compound")
 ```
 
-#### Correlation between data and RDA axis
+### Correlation between data and RDA axis
 
 ```{r}
 dens_corr <-
@@ -236,65 +288,38 @@ dens_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-
-#### Join with loadings
-
-I can pretty this one up and save it as supplemental later. Needs better names, CAS numbers
-
-```{r}
-dens_load_tbl <- 
-  full_join(dens_loads, dens_corr, by = "compound") %>% 
-  left_join(annotations) %>% 
-  select(compound, `Pretty Name`, CAS, RDA1, correlation, corr.p.value, Aroma, `Chemical Family`, `RI Lab`, `RI Lit`, Source)
-dens_load_tbl
-```
-
-#### Renaming unknowns
-Hmm, this should maybe be done for both 2017 and 2018 at the same time.
-
-```{r}
-#TODO: do this in a diff document, use 2018 data too.
-meanRIs <- gc_tidy %>% group_by(Compound) %>% summarize(meanRI = mean(ri, na.rm = TRUE))
-
-dens_load_tbl1 <- left_join(dens_load_tbl, meanRIs, by = c("compound" = "Compound"))
-unks <- dens_load_tbl1 %>% filter(is.na(CAS)) %>% arrange(meanRI) %>% add_column(unk_name = 1:15)
-dens_load_tbl2 <-
-  left_join(dens_load_tbl1, unks) %>% 
-  mutate(`Pretty Name` = ifelse(is.na(unk_name), `Pretty Name`, unk_name)) %>% 
-  mutate(`Pretty Name` = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>% 
-  select(-unk_name)
-```
-
-#### Filter
+### Filter
 
 Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
 
 ```{r}
 dens_biomarkers <-
-  dens_load_tbl2 %>% 
+  dens_corr %>% 
   filter(corr.p.value <= 0.05) %>% 
-  arrange(desc(abs(correlation))) %>% 
-  mutate(compound = fct_inorder(compound))
+  arrange(desc(abs(correlation)))
 ```
 
-#### Univariate regressions
+### Univariate regressions
 
 Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
 
-I'm going to fit a null (intercept only), linear, step, and hinge model to every compound and choose the winner with AIC.
+
 
 ```{r}
 #Only need to do this on compounds in biomarkers list
-biom_data <-
+dens_biom_data <-
   gc_tidy %>% 
   mutate(log.RPA = log(RPA)) %>% 
-  rename(compound = Compound) %>% 
   filter(compound %in% dens_biomarkers$compound)
 ```
 
+I'm going to fit a null (intercept only), linear, step, and hinge model to every compound and choose the winner with AIC.
+
+Null is the simplest (df = 0), folowed by line (df = 1), and step and hinge (df = 2).  I also want to ignore the step and hinge models if the confidence interval for the changepoint overlaps the ends of the x-axis.  That indicates to me that a line or intercept only is a better fit.
+
 ```{r}
 dens_univar <-
-  biom_data %>% 
+  dens_biom_data %>% 
   group_by(compound) %>% 
   nest() %>% 
   #fit null, linear, step, and hing models
@@ -311,54 +336,25 @@ dens_univar <-
   mutate(AIC = map(fit, ~AIC(.x))) %>%
   unnest(AIC)
 ```
-Choose the best model.
-
-Null is the simplest (df = 0), folowed by line (df = 1), and step and hinge (df = 2).  I also want to ignore the step and hinge models if the confidence interval for the changepoint overlaps zero.  That indicates to me that a line or intercept only is a better fit.
-
-```{r}
-#note, this ONLY works when models are in order null, line, step, hinge
-bestAIC <- function(AIC){
-  if(any(AIC[1] >= AIC[2:4] + 2)){
-    if(any(AIC[2] >= AIC[3:4] + 2)){
-      return(min(AIC[3:4]))
-    } else {
-      return(AIC[2])
-    }
-  } else {
-    return(AIC[1])
-  }
-}
-```
-
-Custom tidier for chngpt models.  Warning: this is not very reusable code.
-```{r}
-tidy.chngpt <- function(chngpt.mod) {
-  df <- bind_cols(
-    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
-    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
-  )
-  return(df)
-}
-```
 
 Get model info and coeficients and choose the best model by AIC, penalizing any hinge or step models that have threshold CIs that overlap zero.
 
 ```{r}
-#TODO: also get rid of changepoints with CIs that overlap max(density_final)
+# This is hacky, but works.  Ran into error when trying to do it all in one dataset.
 dens_univar2 <- 
   dens_univar %>% 
   filter(type %in% c("step", "hinge")) %>% 
   mutate(coefs = map(model, tidy.chngpt)) %>% 
   unnest(coefs) %>% 
   select(-data, -model, -fit) %>% 
-  left_join(dens_univar, .) %>% 
+  #joins to null and line models
+  left_join(dens_univar, .) %>%
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
   mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$density_end) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
-
 ```
 
 Create a column that is the slope when linear, the slope after the threshold when hinge, and the difference between intercepts when step.  The idea is to give the reader some idea of the direction and magnitude of the relationship without plotting all 30.
@@ -373,15 +369,28 @@ dens_univar_out <-
 ```
 
 
-#### Merge with loadings and correlations
+### Merge to create tables
+
+Supplemental table should have:
+
+- Compound
+- CAS
+- experimental RI
+- Lit/lab RI
+- Correlation with density RDA
+- Correlation with damage RDA (if I decide it's significant)
+
+```{r}
+#TODO make supplemental table
+```
+
 
 Biomarker table should have: 
 
 - Compound (pretty name)
 - CAS
 - RDA loading
-- Correlation
-- Correlation p-value (??)
+- Correlation (with *** for p-values)
 - Response type (null, linear, hinge, step)
 - Response estimate (linear = slope, hinge = slope after threshold, step = intercept2 - intercept1)
 - Change point
@@ -390,7 +399,9 @@ Biomarker table should have:
 
 ```{r}
 table1 <-
-  left_join(dens_biomarkers, dens_univar_out) %>% 
+  left_join(dens_biomarkers, dens_loads) %>% 
+  left_join(dens_univar_out) %>% 
+  left_join(annotations) %>% 
   mutate_if(is.numeric, round, 3) %>% 
   #format correlations with astrixes instead of showing p-values
   mutate(correlation = case_when(
@@ -399,29 +410,29 @@ table1 <-
     corr.p.value <=0.05   ~ paste0(correlation, "*"),
     TRUE                  ~ as.character(correlation)
   )) %>% 
-  select(Compound = `Pretty Name`,
-         CAS,
-         "RDA Loading" = RDA1,
-         Correlation = correlation,
-         "Response type" = type,
+  select(Compound            = pretty_name,
+         CAS                 = cas,
+         "RDA Loading"       = RDA1,
+         Correlation         = correlation,
+         "Response type"     = type,
          "Response estimate" = estimate,
-         "Change point" = threshold,
-         `Chemical Family`,
-          Aroma)
+         "Change point"      = threshold,
+         "Chemical Family"   = chemical_family,
+          Aroma              = aroma)
 
-write_excel_csv(table1, here("figs", "2017 biomarkers_updated.csv"), na = "-")
+write_excel_csv(table1, here("figs", "2017 density biomarkers.csv"), na = "-")
 ```
 
-### Biomarkers for damage
+## Biomarkers for damage
 
-#### Extract scores and loadings
+### Extract scores and loadings
 
 ```{r}
 dam_scores <- scores(rda_dam, display = "sites", scaling = 0) %>% as_tibble(rownames = "sample")
 dam_loads <- scores(rda_dam, display = "species", scaling = 0) %>% as_tibble(rownames = "compound")
 ```
 
-#### Correlation with RDA axis
+### Correlation with RDA axis
 
 ```{r}
 dam_corr <-
@@ -432,151 +443,115 @@ dam_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
-#### Univariate regressions
-
-```{r}
-dam_lm <- 
-  biom_data %>% 
-  group_by(compound) %>% 
-  nest() %>% 
-  mutate(lm = map(data, ~lm(log.RPA ~ twister_damage, data = .x))) %>% 
-  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>% 
-  unnest(lm.tidy, .preserve = lm) %>% 
-  filter(term != "(Intercept)") %>% 
-  select(-term) %>% 
-  select(compound, lm, lm.slope = estimate, lm.p.value = p.value)
-
-dam_lm
-```
-
-#### Step function
-
-```{r}
-dam_step <-
-  biom_data %>% 
-  group_by(compound) %>% 
-  nest() %>% 
-  mutate(step = map(data,
-                    ~mychngpt(log.RPA ~ 1, ~ twister_damage,
-                              data = .x,
-                              type = "step",
-                              family = "gaussian",
-                              chngpts.cnt	= 100))) %>% 
-  unnest(step) %>% 
-  rename(step.p.value = p.value)
-```
-
-
-#### Join with loadings
-
-Later I can save this as supplemental document
-
-```{r}
-dam_load_tbl <-
-  full_join(dam_loads, dam_corr, by = "compound") %>%
-  full_join(dam_lm, by = "compound") %>% 
-  full_join(dam_step, by = "compound")
-```
-
-```{r}
-#TODO: save for supplemental
-```
-
-#### Filter
-
-Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
+### Filter
 
 ```{r}
 dam_biomarkers <-
-  dam_load_tbl %>% 
-  # filter(corr.p.value <= 0.05 | lm.p.value <= 0.05) %>% 
+  dam_corr %>% 
   filter(corr.p.value <= 0.05) %>% 
-  # Elizabeth suggested against doing this:
-  # mutate(lm.p.value = p.adjust(lm.p.value, "fdr"),
-  #        step.p.value = p.adjust(step.p.value, "fdr")) %>%
-  arrange(desc(abs(correlation))) %>% 
-  select(-PC1)
-dam_biomarkers
+  arrange(desc(abs(correlation)))
 ```
+### Univariate regressions
 
-# Biomarker Table
-Join data from both response variables and annotate with flavor percepts and CAS numbers.
-
-It would be kind of nice if instead of slope I could report an effect size.
 
 ```{r}
-#Join with annotations to get CAS numbers and better names
-dens_biomarkers <- left_join(dens_biomarkers, annotations)
-dam_biomarkers <- left_join(dam_biomarkers, annotations)
+#Only need to do this on compounds in biomarkers list
+dam_biom_data <-
+  gc_tidy %>% 
+  mutate(log.RPA = log(RPA)) %>% 
+  filter(compound %in% dam_biomarkers$compound)
+```
+
+
+```{r}
+dam_univar <-
+  dam_biom_data %>% 
+  group_by(compound) %>% 
+  nest() %>% 
+  #fit null, linear, step, and hing models
+  mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
+         line = map(data, ~lm(log.RPA ~ twister_damage, data = .x)),
+         step = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage,
+                                   family = "gaussian", type = "step", data = .x, var.type = "bootstrap", ci.bootstrap.size = 100)),
+         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage, 
+                                    family = "gaussian", type = "hinge", data = .x))) %>% 
+  gather(-compound, -data, key = type, value = model) %>% 
+  #extract winning glm from step and hing models
+  mutate(fit = ifelse(type %in% c("step", "hinge"), map(model, ~.x$best.fit), model)) %>% 
+  arrange(compound) %>% 
+  mutate(AIC = map(fit, ~AIC(.x))) %>%
+  unnest(AIC)
+```
+
+Get model info and coeficients and choose the best model by AIC, penalizing any hinge or step models that have threshold CIs that overlap zero.
+
+```{r}
+# This is hacky, but works.  Ran into error when trying to do it all in one dataset.
+dam_univar2 <- 
+  dam_univar %>% 
+  filter(type %in% c("step", "hinge")) %>% 
+  mutate(coefs = map(model, tidy.chngpt)) %>% 
+  unnest(coefs) %>% 
+  select(-data, -model, -fit) %>% 
+  #joins to null and line models
+  left_join(dam_univar, .) %>%
+  #set AIC to very high if the threshold CI overlaps zero
+  mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
+  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$twister_damage) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  group_by(compound) %>%
+  # choose the best AIC as described above
+  filter(AIC == bestAIC(AIC))
 ```
 
 ```{r}
-#Combine density and damage biomarkers
-biomarker_tab <-
-  bind_rows(
-  dens_biomarkers %>% add_column(response = "Density"),
-  dam_biomarkers %>% add_column(response = "Damage")
-) 
+dam_univar_out <-
+  dam_univar2 %>% 
+  mutate(estimate = case_when(type == "step"  ~ `I(twister_damage>chngpt)` - `(Intercept)`,
+                              type == "hinge" ~ `(twister_damage-chngpt)+`,
+                              type == "line"  ~ map_dbl(fit, ~coef(.x)[2]))) %>% 
+  select(compound, type, estimate, threshold = chngpt)
 ```
 
-Formatting:
+### Merge to create Table 2
+
+Biomarker table should have: 
+
+- Compound (pretty name)
+- CAS
+- RDA loading
+- Correlation (with *** for p-values)
+- Response type (null, linear, hinge, step)
+- Response estimate (linear = slope, hinge = slope after threshold, step = intercept2 - intercept1)
+- Change point
+- Chemical family (???)
+- Aroma
+
 ```{r}
-biomarker_tab1 <-
-  biomarker_tab %>% 
-  mutate_all(~na_if(.,"NA")) %>% #replace text NAs with actual NAs
-  # get pretty names, unless it's an unkown
-  mutate(Compound = ifelse(is.na(`Pretty Name`), compound, `Pretty Name`)) %>%
-  # formate chemical family
-  mutate(`Chemical Family` = snakecase::to_sentence_case(`Chemical Family`)) %>% 
-  # Add significance stars to all coefficients
+table2 <-
+  left_join(dam_biomarkers, dam_loads) %>% 
+  left_join(dam_univar_out) %>% 
+  left_join(annotations) %>% 
   mutate_if(is.numeric, round, 3) %>% 
-  mutate(lm.slope = case_when(
-    lm.p.value <= 0.001 ~ paste0(lm.slope, "***"),
-    lm.p.value <= 0.01  ~ paste0(lm.slope, "**"),
-    lm.p.value <=0.05   ~ paste0(lm.slope, "*"),
-    TRUE                ~ as.character(lm.slope)
-  )) %>% 
+  #format correlations with astrixes instead of showing p-values
   mutate(correlation = case_when(
     corr.p.value <= 0.001 ~ paste0(correlation, "***"),
     corr.p.value <= 0.01  ~ paste0(correlation, "**"),
     corr.p.value <=0.05   ~ paste0(correlation, "*"),
     TRUE                  ~ as.character(correlation)
   )) %>% 
-  #might also need to include upper bounds above max damage/max density
-  mutate(chngpt = case_when(
-    step.p.value <= 0.001 & chngpt.lowerCI > 0  ~ paste0(chngpt, "***"),
-    step.p.value <= 0.01 & chngpt.lowerCI > 0   ~ paste0(chngpt, "**"),
-    step.p.value <= 0.05 & chngpt.lowerCI > 0   ~ paste0(chngpt, "*"),
-    step.p.value <= 0.05 & chngpt.lowerCI <= 0 ~ paste0(chngpt, "a"), 
-    TRUE                                        ~ as.character(chngpt)
-  ))
+  select(Compound            = pretty_name,
+         CAS                 = cas,
+         "RDA Loading"       = RDA1,
+         Correlation         = correlation,
+         "Response type"     = type,
+         "Response estimate" = estimate,
+         "Change point"      = threshold,
+         "Chemical Family"   = chemical_family,
+          Aroma              = aroma)
 
-gc_tidy %>% filter(sample == "Q1") %>% select(No., Compound) %>% filter(Compound %in% biomarker_tab$compound) %>% write_csv(here("comounds to check censoring.csv"))
-```
-Select columns
-```{r}
-biomarker_tab2 <-
-  biomarker_tab1 %>% 
-  select("Herbivory proxy" = response,
-         Compound,
-         CAS,
-         "RDA axis loading" = RDA1,
-         "Correlation to RDA axis" = correlation,
-         # "Correlation p-value" = corr.p.value,
-         "Linear regression slope" = lm.slope,
-         # "Linear regression p-value" = lm.p.value,
-         "Change point" = chngpt,
-         # "Step p-value" = step.p.value,
-         Aroma,
-         `Chemical Family`)
-biomarker_tab2
+write_excel_csv(table2, here("figs", "2017 damage biomarkers.csv"), na = "-")
 ```
 
-write to CSV for formatting in Numbers / Excel
-
-```{r}
-write_excel_csv(biomarker_tab2, here("figs", "2017 biomarkers.csv"))
-```
 
 # Plots
 
@@ -591,7 +566,7 @@ dens_plotdata <-
   # full_join(annotations, by = "compound") %>% 
   dplyr::slice(1:9) %>% 
   left_join(biom_data, by = "compound") %>% 
-  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), mean, .desc = TRUE))
+  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE))
 
 #just linear models
 dens_justlm <- dens_plotdata %>% filter(type == "line")
@@ -617,7 +592,7 @@ dens_plot <-
                    yend = `(Intercept)` * `(density_end-chngpt)+`)) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dens_justlm, size = 0.5) +
-  facet_wrap(~`Pretty Name`, scales = "free_y") +
+  facet_wrap(~pretty_name, scales = "free_y") +
   labs(x = "Leafhopper density (insects / leaf)",
        y = "ln(relative peak area)") +
   theme_bw()
@@ -636,7 +611,7 @@ dens_data <-
   mutate_at(vars("(Intercept)", "I(density_end>chngpt)", "chngpt"),
             ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <=0, NA, .)) %>% 
   left_join(gc_tidy) %>% 
-  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
+  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), .desc = TRUE))
 
 dens_data2 <- 
   dens_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
@@ -655,7 +630,7 @@ dens_plot <-
                    xend = 1.142857,
                    y = `(Intercept)`+`I(density_end>chngpt)`, 
                    yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
-  facet_wrap(~`Pretty Name`, scales = "free_y") +
+  facet_wrap(~pretty_name, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Leafhopper density (insects / young leaf)") +
   theme_bw() #+ 
   # geom_hline(aes(yintercept = log(1000/306997)), color = "red")
@@ -683,7 +658,7 @@ dam_data <-
   mutate_at(vars("(Intercept)", "I(twister_damage>chngpt)", "chngpt"),
             ~ifelse(step.p.value > 0.05 | chngpt.lowerCI <= 0, as.numeric(NA), .)) %>% 
   left_join(gc_tidy) %>% 
-  mutate(`Pretty Name` = fct_reorder(`Pretty Name`, abs(correlation), .desc = TRUE))
+  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), .desc = TRUE))
 
 dam_data2 <- 
   dam_data %>% filter(lm.p.value <= 0.05 & is.na(chngpt))
@@ -702,7 +677,7 @@ dam_plot <-
                    xend = max(gc_tidy$twister_damage),
                    y = `(Intercept)`+`I(twister_damage>chngpt)`, 
                    yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "black") +
-  facet_wrap(~`Pretty Name`, scales = "free_y") +
+  facet_wrap(~pretty_name, scales = "free_y") +
   labs(y = "ln(Relative peak area)", x = "Percent damage to focal leaf") +
   theme_bw()
 dam_plot
