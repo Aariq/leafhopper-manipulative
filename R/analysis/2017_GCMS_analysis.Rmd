@@ -146,16 +146,19 @@ rownames(chemdata) <- gc_wide.logscale$sample
 ## How many compounds total?
 
 ```{r}
-length(unique(gc_tidy$Compound))
+length(unique(gc_tidy$compound))
 ```
 
 ## How many compounds are found in all samples?
 
 ```{r}
-gc_tidy %>% 
+common <-
+  gc_tidy %>% 
   group_by(compound) %>% 
   summarize(nsample = sum(present)) %>% 
   filter(nsample > 17) 
+nrow(common)
+common
 ```
 
 ## Summary table
@@ -196,7 +199,7 @@ rda_dens <-
 
 ```{r}
 synt_dens <- MVA.synt(rda_dens)
-synt_dens[[1]]
+synt_dens[[1]][[2]]
 ```
 10.66%
 
@@ -222,9 +225,9 @@ rda_dam <- rda(chemdata ~ gc_wide.logscale$mean_percent_damage)
 
 ```{r}
 synt_dam <- MVA.synt(rda_dam)
-synt_dam[[1]]
+synt_dam[[1]][[2]]
 ```
-
+5.53%
 
 ### ANOVA
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
@@ -246,9 +249,9 @@ rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
 
 ```{r}
 synt_dam <- MVA.synt(rda_dam)
-synt_dam[[1]]
+synt_dam[[1]][[2]]
 ```
-
+7.94%
 
 ### ANOVA
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
