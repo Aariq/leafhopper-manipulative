@@ -31,6 +31,7 @@ library(broom)
 library(modelr)
 library(glue)
 library(cowplot)
+library(chngpt)
 
 here <- here::here #make sure to override the here() function from lubridate
 ```
@@ -192,17 +193,49 @@ Top contributors: EGCG, Caffeine, Theobromine, ECG.  All negative relationship w
 
 Univariate measures
 
+Fit null, linear, step, and hinge models to all four compounds.
+
 ```{r}
 lc_lm_2017 <-
   left_join(lc_biomarkers_2017, lc2017_tidy) %>% 
   group_by(compound) %>% 
   nest() %>% 
-  mutate(lm = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, data = .x))) %>% 
-  mutate(lm.tidy = map(lm, ~broom::tidy(.))) %>%
-  unnest(lm.tidy, .preserve = c(data, lm)) %>% 
-  filter(term != "(Intercept)") %>% 
-  select(compound, slope = estimate, lm.p.value = p.value)
+  mutate(linear = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, data = .x)),
+         null = map(data, ~lm(conc_ug_mg ~ 1, data = .x)),
+         step = map(data, ~ chngptm(conc_ug_mg ~ 1, ~ mean_percent_damage,
+                                    family = "gaussian", type = "step", data = .x, 
+                                    var.type = "bootstrap", ci.bootstrap.size = 100)),
+         hinge = map(data, ~chngptm(conc_ug_mg ~ 1, ~ mean_percent_damage,
+                                    family = "gaussian", type = "hinge", data = .x))) %>%
+  gather(-compound, -data, key = type, value = model) %>% 
+  mutate(fit = ifelse(type %in% c("step", "hinge"), map(model, ~.x$best.fit), model)) %>% 
+  arrange(compound) %>% 
+  mutate(AIC = map(fit, ~AIC(.x))) %>%
+  unnest(AIC)
 ```
+```{r}
+119.83-122.28
+```
+
+Choose best fit manually by AIC:
+
+- Caffeine: linear
+- Epicatechin gallate: null (step threshold overlaps zero)
+- Epigallocatechin gallate: linear
+- Theobromine: null (step threshold overlaps zero)
+
+Check that changepoint doesn't overlap zero
+
+```{r}
+lc_lm_2017 <-
+  lc_lm_2017 %>% 
+  ungroup() %>% 
+  filter(compound == "Caffeine" & type == "linear" |
+           compound == "Epicatechin gallate" & type == "null" |
+           compound == "Epigallocatechin gallate" & type == "linear" |
+           compound == "Theobromine" & type == "null")
+```
+
 
 In all cases the linear model was a better fit than quadratic, so I'm just going with linear.
 
@@ -220,7 +253,7 @@ lc_plotdata.2017 <-
 lc_plot.2017 <-
   ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg)) +
   geom_point() +
-  geom_smooth(method = "lm", se = FALSE, data = lc_plotdata.2017 %>% filter(compound == "Epigallocatechin gallate"), color = "black", size = 0.5, linetype = 1) +
+  geom_smooth(method = "lm", se = FALSE, data = lc_plotdata.2017 %>% filter(compound %in% c("Epigallocatechin gallate", "Caffeine")), color = "black", size = 0.5, linetype = 1) +
   facet_wrap(~compound, scales = "free_y") +
   theme_bw() +
   theme(legend.position = "none") +
