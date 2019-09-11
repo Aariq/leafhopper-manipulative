@@ -635,7 +635,7 @@ dam_plot <-
   geom_segment(aes(x = chngpt,
                    xend = max(gc_tidy$twister_damage),
                    y = `(Intercept)`,
-                   yend = `(Intercept)` * `(twister_damage-chngpt)+`)) +
+                   yend = `(Intercept)` + `(twister_damage-chngpt)+` * (max(gc_tidy$twister_damage) - chngpt))) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dam_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +
