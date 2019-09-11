@@ -1,6 +1,6 @@
 ﻿Compound,CAS,RDA Loading,Correlation,Response type,Response estimate,Change point,Chemical Family,Aroma
 1-Hexanol,111-27-3,0.2,0.801***,line,0.166,-,Aliphatic alcohol,"resin, flower, green"
-(3Z)-Hexenyl hexanoate,31501-11-8,0.175,0.768***,line,0.15,-,Fatty acid ester,"fruit, prune"
+(3Z)-Hexenyl hexanoate,31501-11-8,0.175,0.768***,line,0.15,-,Fatty acid ester,"green, fruity, fatty, tropical"
 cis-3-Hexenyl isovalerate,35154-45-1,0.199,0.727***,step,10.545,8.541,Fatty acid ester,"fresh, green, apple, fruity, tropical, pineapple, dirty"
 (Z)-2-Hexenol,928-94-9,0.175,0.663**,line,0.138,-,Alkenyl alcohol,"leaf, green, wine, fruit"
 Coumaran,496-16-2,0.162,0.651**,hinge,0.167,8.541,Heterocyclic compound,-
