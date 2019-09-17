@@ -211,7 +211,7 @@ Significant effect of ending density on leaf volatiles
 ### Fit RDA
 
 ```{r}
-rda_dam <- rda(chemdata ~ gc_wide.logscale$mean_percent_damage)
+rda_dam <- rda(chemdata ~ log(gc_wide.logscale$mean_percent_damage))
 ```
 
 ### How much total variance does the experimental design explain?
@@ -235,7 +235,7 @@ Not significant
 ### Fit RDA
 
 ```{r}
-rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
+rda_dam <- rda(chemdata ~ log(gc_wide.logscale$twister_damage))
 ```
 
 ### How much total variance does the experimental design explain?
@@ -253,7 +253,7 @@ Test for significance that this amount of explained variance is higher than the 
 anova(rda_dam)
 ```
 
-Marginally significant? Not sure if should report biomarkers.
+Marginally significant? Not sure if should report biomarkers. (not significant if not log-transformed)
 
 
 # Biomarkers
@@ -297,15 +297,16 @@ dens_biomarkers <-
 
 ### Univariate regressions
 
-Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
+~~Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.~~
 
+Nah, don't log-transform.
 
 
 ```{r}
 #Only need to do this on compounds in biomarkers list
 dens_biom_data <-
   gc_tidy %>% 
-  mutate(log.RPA = log(RPA)) %>% 
+  # mutate(log.RPA = log(RPA)) %>% 
   filter(compound %in% dens_biomarkers$compound)
 ```
 
@@ -319,11 +320,11 @@ dens_univar <-
   group_by(compound) %>% 
   nest() %>% 
   #fit null, linear, step, and hing models
-  mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
-         line = map(data, ~lm(log.RPA ~ density_end, data = .x)),
-         step = map(data, ~chngptm(log.RPA ~ 1, ~ density_end,
+  mutate(null = map(data, ~lm(RPA ~ 1, data = .x)),
+         line = map(data, ~lm(RPA ~ density_end, data = .x)),
+         step = map(data, ~chngptm(RPA ~ 1, ~ density_end,
                                    family = "gaussian", type = "step", data = .x, var.type="bootstrap", ci.bootstrap.size=100)),
-         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ density_end, 
+         hinge = map(data, ~chngptm(RPA ~ 1, ~ density_end, 
                                     family = "gaussian", type = "hinge", data = .x))) %>% 
   gather(-compound, -data, key = type, value = model) %>% 
   #extract winning glm from step and hing models
@@ -416,7 +417,7 @@ table1 <-
          "Chemical Family"   = chemical_family,
           Aroma              = aroma)
 
-write_excel_csv(table1, here("figs", "2017 density biomarkers.csv"), na = "-")
+# write_excel_csv(table1, here("figs", "2017 density biomarkers.csv"), na = "-")
 ```
 
 ## Biomarkers for damage
@@ -454,7 +455,7 @@ dam_biomarkers <-
 #Only need to do this on compounds in biomarkers list
 dam_biom_data <-
   gc_tidy %>% 
-  mutate(log.RPA = log(RPA)) %>% 
+  # mutate(log.RPA = log(RPA)) %>% 
   filter(compound %in% dam_biomarkers$compound)
 ```
 
@@ -465,11 +466,11 @@ dam_univar <-
   group_by(compound) %>% 
   nest() %>% 
   #fit null, linear, step, and hing models
-  mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
-         line = map(data, ~lm(log.RPA ~ twister_damage, data = .x)),
-         step = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage,
+  mutate(null = map(data, ~lm(RPA ~ 1, data = .x)),
+         line = map(data, ~lm(RPA ~ log(twister_damage), data = .x)),
+         step = map(data, ~chngptm(RPA ~ 1, ~ log(twister_damage),
                                    family = "gaussian", type = "step", data = .x, var.type = "bootstrap", ci.bootstrap.size = 100)),
-         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage, 
+         hinge = map(data, ~chngptm(RPA ~ 1, ~ log(twister_damage), 
                                     family = "gaussian", type = "hinge", data = .x))) %>% 
   gather(-compound, -data, key = type, value = model) %>% 
   #extract winning glm from step and hing models
@@ -493,7 +494,7 @@ dam_univar2 <-
   left_join(dam_univar, .) %>%
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
-  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$twister_damage) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  mutate(AIC = if_else(chngpt.upper.CI < max(log(gc_tidy$twister_damage)) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
@@ -502,8 +503,8 @@ dam_univar2 <-
 ```{r}
 dam_univar_out <-
   dam_univar2 %>% 
-  mutate(estimate = case_when(type == "step"  ~ `I(twister_damage>chngpt)` - `(Intercept)`,
-                              type == "hinge" ~ `(twister_damage-chngpt)+`,
+  mutate(estimate = case_when(type == "step"  ~ `I(log(twister_damage)>chngpt)` - `(Intercept)`,
+                              type == "hinge" ~ `(log(twister_damage)-chngpt)+`,
                               type == "line"  ~ map_dbl(fit, ~coef(.x)[2]))) %>% 
   select(compound, type, estimate, threshold = chngpt)
 ```
@@ -545,7 +546,7 @@ table2 <-
          "Chemical Family"   = chemical_family,
           Aroma              = aroma)
 
-write_excel_csv(table2, here("figs", "2017 damage biomarkers.csv"), na = "-")
+# write_excel_csv(table2, here("figs", "2017 damage biomarkers.csv"), na = "-")
 ```
 
 
@@ -569,7 +570,7 @@ dens_justlm <- dens_plotdata %>% filter(type == "line")
 
 ```{r}
 dens_plot <- 
-  ggplot(dens_plotdata, aes(x = density_end, y = log.RPA)) +
+  ggplot(dens_plotdata, aes(x = density_end, y = RPA)) +
   geom_point(alpha = 0.5) +
   geom_segment(aes(x = 0,
                  xend = chngpt,
@@ -589,7 +590,7 @@ dens_plot <-
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dens_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +
   labs(x = "Leafhopper density (insects / leaf)",
-       y = "ln(relative peak area)") +
+       y = "relative peak area") +
   theme_bw()
 dens_plot
 ```
@@ -620,7 +621,7 @@ dam_justlm <- dam_plotdata %>% filter(type == "line")
 
 ```{r}
 dam_plot <- 
-  ggplot(dam_plotdata, aes(x = twister_damage, y = log.RPA)) +
+  ggplot(dam_plotdata, aes(x = log(twister_damage), y = RPA)) +
   geom_point(alpha = 0.5) +
   geom_segment(aes(x = 0,
                  xend = chngpt,
@@ -628,19 +629,19 @@ dam_plot <-
                  yend = `(Intercept)`), color = "black") +
   #step
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$twister_damage),
-                   y = `(Intercept)`+`I(twister_damage>chngpt)`, 
-                   yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "black") +
+                   xend = max(log(gc_tidy$twister_damage)),
+                   y = `(Intercept)`+`I(log(twister_damage)>chngpt)`, 
+                   yend = `(Intercept)`+`I(log(twister_damage)>chngpt)`), color = "black") +
   #hinge
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$twister_damage),
+                   xend = max(log(gc_tidy$twister_damage)),
                    y = `(Intercept)`,
-                   yend = `(Intercept)` + `(twister_damage-chngpt)+` * (max(gc_tidy$twister_damage) - chngpt))) +
+                   yend = `(Intercept)` + `(log(twister_damage)-chngpt)+` * (max(log(gc_tidy$twister_damage)) - chngpt))) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dam_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +
-  labs(x = "% damage to focal leaf",
-       y = "ln(relative peak area)") +
+  labs(x = "ln(% damage to focal leaf)",
+       y = "relative peak area") +
   theme_bw()
 dam_plot
 ```
