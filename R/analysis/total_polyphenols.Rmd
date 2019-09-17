@@ -19,9 +19,7 @@ library(janitor)
 library(cowplot)
 library(broom)
 library(glue)
-# library(gghighlight)
-# library(knitr)
-# library(ggrepel)
+library(chngpt)
 ```
 
 # Read in data
@@ -44,7 +42,8 @@ tp2017 <-
   clean_names() %>% 
   full_join(damage2017, by = "sample") %>%
   filter(sample != "Q2") %>% 
-  select(-leaf_density) #identical to `density_end`
+  select(-leaf_density) %>% #identical to `density_end`
+  mutate(log_damage = log(mean_percent_damage))
 tp2017
 ```
 ```{r}
@@ -52,7 +51,8 @@ tp2018 <-
   tp2018 %>% 
   clean_names() %>% 
   full_join(damage2018, by = "sample") %>%
-  filter(sample != "J23")
+  filter(sample != "J23") %>% 
+  mutate(log_damage = log(mean_percent_damage))
 tp2018
 ```
 
@@ -79,29 +79,39 @@ shapiro.test(tp2017$mg_g_gae)
 
 ## Polyphenols vs. Density
 
-I'll test for a quadratic or linear relationship.  **NOTE**: I could possibly do this by using # leafhoppers as a predictor and # leaves as an offset.  Not sure if that would be any different though.
+I'm going to apply the same models as I do for LCMS and GCMS compounds: null, linear, step, and hinge.  Then select the best fit by AIC
 
 ```{r}
-dens.poly.17 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2017)
+# dens.poly.17 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2017)
 dens.linear.17 <- lm(mg_g_gae ~ density_end, data = tp2017)
 dens.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
-bbmle::AICtab(dens.poly.17, dens.linear.17, dens.null.17)
-# summary(dens.poly.17)
-Anova(dens.poly.17)
+dens.step.17 <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "step", family = "gaussian", data = tp2017,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dens.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "hinge", family = "gaussian", data = tp2017)
+
+bbmle::AICtab(dens.linear.17, dens.null.17, dens.step.17$best.fit, dens.hinge.17$best.fit)
+summary(dens.step.17)
 ```
 
-Looks like best model is intercept only, although polynomial is maybe better than linear.  No significant relationship between leafhopper density and total phenolics, with a trend toward a polynomial relationship.
+Step model wins
 
 ```{r eval=FALSE, include=FALSE}
-ggplot(augment(dens.poly.17), aes(.resid)) + geom_histogram(bins = 15)
-ggplot(augment(dens.poly.17), aes(sample = .resid)) + geom_qq() + geom_qq_line()
+ggplot(augment(dens.step.17$best.fit), aes(.resid)) + geom_histogram(bins = 15)
+ggplot(augment(dens.step.17$best.fit), aes(sample = .resid)) + geom_qq() + geom_qq_line()
 ```
 
 ```{r echo=FALSE}
 dens.2017.plot <-
   ggplot(tp2017, aes(x = density_end, y = mg_g_gae)) +
-  geom_point() +
-  # geom_smooth(method = "lm", formula = "y ~ poly(x, 2)", se = FALSE) +
+  geom_point(alpha = 0.75) +
+  geom_segment(aes(x = min(density_end),
+                   xend = dens.step.17$chngpt,
+                   y = dens.step.17$coefficients[1],
+                   yend = dens.step.17$coefficients[1])) +
+  geom_segment(aes(x = dens.step.17$chngpt,
+                   xend = max(density_end),
+                   y = dens.step.17$coefficients[1] + dens.step.17$coefficients[2],
+                   yend = dens.step.17$coefficients[1] + dens.step.17$coefficients[2])) +
   labs(x = "Final leahopper density (insects / young leaf)",
        y = "Total polyphenols (mg/g GAE)",
        # caption = "Sample Q2 removed",
@@ -113,26 +123,38 @@ dens.2017.plot
 ## Polyphenols vs. Damage
 
 ```{r}
-dam.poly.17 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2017)
-dam.linear.17 <- lm(mg_g_gae ~ mean_percent_damage, data = tp2017)
+# dam.poly.17 <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp2017)
+dam.linear.17 <- lm(mg_g_gae ~ log_damage, data = tp2017)
 dam.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
-bbmle::AICtab(dam.poly.17, dam.linear.17, dam.null.17)
-Anova(dam.poly.17)
+dam.step.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "step", family = "gaussian", data = tp2017,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dam.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "gaussian", data = tp2017)
+
+bbmle::AICtab(dam.linear.17, dam.null.17, dam.step.17$best.fit, dam.hinge.17$best.fit)
+summary(dam.hinge.17)
+coefficients(dam.hinge.17)
+dam.hinge.17$coefficients[2]*dam.hinge.17$coefficients[1]
 ```
-Now, the polynomial model is the best and there is a marginally significant relationship with  % damage (p = `r round(Anova(dam.poly.17)[["Pr(>F)"]][1],3)`)
+Now, the hinge model is the best.
 
 
 ```{r echo=FALSE}
 dam.2017.plot <-
-  ggplot(tp2017, aes(x = mean_percent_damage, y = mg_g_gae)) +
-  geom_point() +
-  geom_smooth(method = "lm", formula = "y ~ poly(x, 2)", se = FALSE, color = "black", size = 0.5) +
-  labs(x = "Mean % damaged leaf area",
+  ggplot(tp2017, aes(x = log_damage, y = mg_g_gae)) +
+  geom_point(alpha = 0.75) +
+  #hinge
+  geom_segment(aes(x = min(log_damage),
+                   xend = dam.hinge.17$chngpt,
+                   y = dam.hinge.17$coefficients[1],
+                   yend = dam.hinge.17$coefficients[1])) +
+  labs(x = "ln(mean % damaged leaf area)",
        y = "Total polyphenols (mg/g GAE)",
-       # caption = "Sample Q2 removed",
        title = "2017") +
+  geom_segment(aes(x = dam.hinge.17$chngpt,
+                   xend = max(log_damage),
+                   y = dam.hinge.17$coefficients[1],
+                   yend = dam.hinge.17$coefficients[1] + dam.hinge.17$coefficients[2])) +
   theme_bw() #+
-  # annotate(geom = "text", x = 1.1, y = 4, label = glue("p = {round(Anova(dam.poly.17)$`Pr(>F)`[1], 3)}"))
 dam.2017.plot
 ```
 
@@ -163,10 +185,13 @@ I'll test for a quadratic or linear relationship
 
 ### Jin Guan Yin
 ```{r}
-dens.jgy.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_jgy)
+# dens.jgy.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_jgy)
 dens.jgy.lm <- lm(mg_g_gae ~ density_end, data = tp_jgy)
 dens.jgy.null <- lm(mg_g_gae ~ 1, data = tp_jgy)
-bbmle::AICtab(dens.jgy.poly, dens.jgy.lm, dens.jgy.null)
+dens.jgy.step <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "step", family = "gaussian", data = tp_jgy,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dens.jgy.hinge <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "hinge", family = "gaussian", data = tp_jgy)
+bbmle::AICtab(dens.jgy.lm, dens.jgy.null, dens.jgy.step$best.fit, dens.jgy.hinge$best.fit)
 ```
 
 The null model wins. No effect of leafhopper density on total polyphenols for JGY
@@ -174,25 +199,41 @@ The null model wins. No effect of leafhopper density on total polyphenols for JG
 ### Long Jing
 
 ```{r}
-dens.lj.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_lj)
+# dens.lj.poly <- lm(mg_g_gae ~ poly(density_end, 2), data = tp_lj)
 dens.lj.lm <- lm(mg_g_gae ~ density_end, data = tp_lj)
 dens.lj.null <- lm(mg_g_gae ~ 1, data = tp_lj)
-bbmle::AICtab(dens.lj.poly, dens.lj.lm, dens.lj.null)
-# car::Anova(dens.lj.lm)
+
+dens.lj.step <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "step", family = "gaussian", data = tp_lj,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dens.lj.hinge <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "hinge", family = "gaussian", data = tp_lj)
+
+bbmle::AICtab(dens.lj.lm, dens.lj.null, dens.lj.step$best.fit, dens.lj.hinge$best.fit)
+summary(dens.lj.step)
 ```
 
-The null model wins. No effect of leafhopper density on total polyphenols for JGY
-
-
+Step model wins
 
 ```{r}
+#TODO add in step function line for longjing
 dens.2018.plot <-
   ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
-  geom_point() +
+  geom_point(alpha = 0.75) +
+  # step for longjing
+  geom_segment(aes(x = min(density_end),
+                   xend = dens.lj.step$chngpt,
+                   y = dens.lj.step$coefficients[1],
+                   yend = dens.lj.step$coefficients[1]),
+               color = "darkgreen") +
+  geom_segment(aes(x = dens.lj.step$chngpt,
+                   xend = max(density_end),
+                   y = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2],
+                   yend = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2]),
+               color = "darkgreen") +
   labs(x = "Final leafhopper density (insects / shoot)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +
-  scale_color_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
+  scale_color_manual(name = "Cultivar", values = c("J" = "purple", "L" = "darkgreen"),
+                     labels = c("J" = "JGY", "L" = "LJ")) +
   scale_shape_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
   theme_bw() 
 dens.2018.plot
@@ -201,31 +242,39 @@ dens.2018.plot
 ## Polyphenols vs. damage
 ### Jin Guan Yin
 ```{r}
-dam.jgy.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_jgy)
-dam.jgy.lm <- lm(mg_g_gae ~ mean_percent_damage, data = tp_jgy)
+# dam.jgy.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_jgy)
+dam.jgy.lm <- lm(mg_g_gae ~ log_damage, data = tp_jgy)
 dam.jgy.null <- lm(mg_g_gae ~ 1, data = tp_jgy)
-bbmle::AICtab(dam.jgy.poly, dam.jgy.lm, dam.jgy.null)
+dam.jgy.step <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "step", family = "gaussian", data = tp_jgy,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dam.jgy.hinge <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "gaussian", data = tp_jgy)
+
+bbmle::AICtab(dam.jgy.lm, dam.jgy.null, dam.jgy.step$best.fit, dam.jgy.hinge$best.fit)
 ```
 Null model wins
 
 ### Long Jing
 ```{r}
-dam.lj.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_lj)
+# dam.lj.poly <- lm(mg_g_gae ~ poly(mean_percent_damage, 2), data = tp_lj)
 dam.lj.lm <- lm(mg_g_gae ~ mean_percent_damage, data = tp_lj)
 dam.lj.null <- lm(mg_g_gae ~ 1, data = tp_lj)
-bbmle::AICtab(dam.lj.poly, dam.lj.lm, dam.lj.null)
+dam.lj.step <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "step", family = "gaussian", data = tp_lj,
+                        var.type = "bootstrap", ci.bootstrap.size = 100)
+dam.lj.hinge <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "gaussian", data = tp_lj)
+bbmle::AICtab(dam.lj.lm, dam.lj.null, dam.lj.step$best.fit, dam.lj.hinge$best.fit)
 ```
 
 The winning model is the null model
 
 ```{r}
 dam.2018.plot <-
-  ggplot(tp2018, aes(x = mean_percent_damage, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
-  geom_point() +
-  labs(x = "Mean % damaged leaf area",
+  ggplot(tp2018, aes(x = log_damage, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
+  geom_point(alpha = 0.75) +
+  labs(x = "ln(mean % damaged leaf area)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +
-  scale_color_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
+  scale_color_manual(name = "Cultivar", values = c("J" = "purple", "L" = "darkgreen"),
+                     labels = c("J" = "JGY", "L" = "LJ")) +
   scale_shape_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
   theme_bw() 
 dam.2018.plot

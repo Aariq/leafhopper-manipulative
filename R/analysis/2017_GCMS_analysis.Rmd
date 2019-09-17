@@ -582,20 +582,20 @@ dens_justlm <- dens_plotdata %>% filter(type == "line")
 dens_plot <- 
   ggplot(dens_plotdata, aes(x = density_end, y = log.RPA)) +
   geom_point(alpha = 0.5) +
-  geom_segment(aes(x = 0,
+  geom_segment(aes(x = min(density_end),
                  xend = chngpt,
                  y = `(Intercept)`,
                  yend = `(Intercept)`), color = "black") +
   #step
   geom_segment(aes(x = chngpt,
-                   xend = 1,
+                   xend = max(density_end),
                    y = `(Intercept)`+`I(density_end>chngpt)`, 
                    yend = `(Intercept)`+`I(density_end>chngpt)`), color = "black") +
   #hinge
   geom_segment(aes(x = chngpt,
-                   xend = 1,
+                   xend = max(density_end),
                    y = `(Intercept)`,
-                   yend = `(Intercept)` * `(density_end-chngpt)+`)) +
+                   yend = `(Intercept)` + `(density_end-chngpt)+`)) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dens_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +

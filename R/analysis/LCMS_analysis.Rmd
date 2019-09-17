@@ -35,6 +35,17 @@ library(chngpt)
 
 here <- here::here #make sure to override the here() function from lubridate
 ```
+```{r}
+
+#Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
+tidy.chngpt <- function(chngpt.mod) {
+  df <- bind_cols(
+    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
+    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
+  )
+  return(df)
+}
+```
 
 # Purpose
 
@@ -45,6 +56,7 @@ Analysis of LCMS data from 2017 and 2018 leafhopper density experiments.
 ```{r data, echo=TRUE}
 lc2017 <- read_rds(here("data", "cleaned", "2017_lcms_wide.rds")) %>% 
   filter(sample != "Q2") #determined elsewhere that this has an unusually high ammount of damage for the treatment
+
 lc2018 <- read_rds(here("data", "cleaned", "2018_lcms_wide.rds")) %>% 
   filter(sample != "J23") #determined elswhere that this has an unusually high ammount of damage for the treatment
 
@@ -88,84 +100,112 @@ vis_dat(lc2018)
 
 lc2017_tidy <- 
   lc2017_tidy %>% 
-  filter(compound != "Catechin gallate") %>% #not detected in any sample
+  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #not detected in any sample
   mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg))
 
 lc2017_2 <-
   lc2017 %>% 
   mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`) #all zeroes
+  select(-`Catechin gallate`, -`Gallic acid`, -`Theophylline`) #all zeroes
 
 # min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
 lc2018_tidy <-
   lc2018_tidy %>% 
-  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #all zeros for all samples
+  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #all zeros for all samples
   mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg)) 
 
 lc2018_2 <- 
   lc2018 %>% 
   mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`, -Theophylline) #all zeroes
+  select(-`Catechin gallate`, -Theophylline, -`Gallic acid`) #all zeroes
+```
+
+## Scale and transform data
+
+```{r}
+lc2017_scaled <-
+  lc2017_2 %>%
+  mutate_at(vars(Caffeine:Theobromine), scale) %>% 
+  mutate(log_damage = log(mean_percent_damage))
+
+lc2017_tidy <- 
+  lc2017_tidy %>% 
+  mutate(log_damage = log(mean_percent_damage))
+
+lc2018_2 <- 
+  lc2018_2 %>% 
+  mutate(log_damage = log(mean_percent_damage))
+
+lc2018_tidy <- 
+  lc2018_tidy %>% 
+  mutate(log_damage = log(mean_percent_damage))
 ```
 
 ## Examine correlations
 
 ```{r}
-corrr::correlate(lc2017_2[11:23]) %>% 
+corrr::correlate(lc2017_2[11:21]) %>% 
   corrr::shave() %>% 
   corrr::rplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(title = "2017")
 
-corrr::correlate(lc2018_2[11:22]) %>% 
+corrr::correlate(lc2018_2[11:21]) %>% 
   corrr::shave() %>% 
   corrr::rplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(title = "2018")
 ```
 
-There are some strong correlations, so multivariable methods might be best?
+There are some strong correlations, so multivariable methods are best.
 
 # 2017
-## RDA
-
-Probably RDA is better since there are some correlations?
-
+## Leafhopper density RDA
 
 1. Fit RDA model
 
 ```{r}
-lc2017_scaled <-
-  lc2017_2 %>%
-  mutate_at(vars(Caffeine:Theophylline), scale)
-
-rda.2017 <-
-  rda(lc2017_scaled %>% select(Caffeine:Theophylline) ~ mean_percent_damage, data = lc2017_scaled)
+dens_rda.2017 <-
+  rda(lc2017_scaled %>% select(Caffeine:Theobromine) ~ density_end, data = lc2017_scaled)
 ```
 
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda.2017)
+MVA.synt(dens_rda.2017)[[1]][[2]]
 ```
 
-Only 11.62%
+Only 5.19% variation explained
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
-anova(rda.2017)
+anova(dens_rda.2017)
 ```
 
-Marginally significant effect of leaf damage on metabolites
+## Mean leaf damage RDA
 
-4. Then we test for significance of individual factors and interaction terms:
+1. fit model
+```{r}
+dam_rda.2017 <-
+  rda(lc2017_scaled %>% select(Caffeine:Theobromine) ~ log_damage, data = lc2017_scaled)
+```
+
+
+2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.anova(rda.2017)
+MVA.synt(dam_rda.2017)[[1]][[2]]
 ```
 
+9.21 % of variation explained
+
+3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
+
+```{r}
+anova(dam_rda.2017)
+```
 Marginally significant effect of leaf damage on metabolites.
 
 5. Loadings
@@ -173,16 +213,16 @@ Marginally significant effect of leaf damage on metabolites.
 ```{r}
 # MVA.scores(dbrda_dens)
 
-scores <- MVA.scores(rda.2017)$coord
-loads <- MVA.load(rda.2017)$loads %>% rename(loading = `Constr. comp. 1`)
+scores <- MVA.scores(dam_rda.2017)$coord
+loads <- MVA.load(dam_rda.2017)$loads %>% rename(loading = `Constr. comp. 1`)
 
-data <- lc2017_2 %>% select(Caffeine:Theophylline)
+data <- lc2017_scaled %>% select(Caffeine:Theobromine)
 
 
 lc_biomarkers_2017 <-
   map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
   bind_cols(loads) %>%
-  filter(p.value < 0.05) %>%
+  filter(p.value <= 0.05) %>%
   select(compound, loading, correlation = estimate, p.value) %>% 
   arrange(desc(abs(correlation)))
 lc_biomarkers_2017
@@ -198,31 +238,50 @@ Fit null, linear, step, and hinge models to all four compounds.
 ```{r}
 lc_lm_2017 <-
   left_join(lc_biomarkers_2017, lc2017_tidy) %>% 
+  mutate(log_damage = log(mean_percent_damage)) %>% 
   group_by(compound) %>% 
   nest() %>% 
-  mutate(linear = map(data, ~lm(conc_ug_mg ~ mean_percent_damage, data = .x)),
+  mutate(linear = map(data, ~lm(conc_ug_mg ~ log_damage, data = .x)),
          null = map(data, ~lm(conc_ug_mg ~ 1, data = .x)),
-         step = map(data, ~ chngptm(conc_ug_mg ~ 1, ~ mean_percent_damage,
+         step = map(data, ~ chngptm(conc_ug_mg ~ 1, ~ log_damage,
                                     family = "gaussian", type = "step", data = .x, 
                                     var.type = "bootstrap", ci.bootstrap.size = 100)),
-         hinge = map(data, ~chngptm(conc_ug_mg ~ 1, ~ mean_percent_damage,
+         hinge = map(data, ~chngptm(conc_ug_mg ~ 1, ~ log_damage,
                                     family = "gaussian", type = "hinge", data = .x))) %>%
   gather(-compound, -data, key = type, value = model) %>% 
   mutate(fit = ifelse(type %in% c("step", "hinge"), map(model, ~.x$best.fit), model)) %>% 
   arrange(compound) %>% 
   mutate(AIC = map(fit, ~AIC(.x))) %>%
   unnest(AIC)
+
+
+lc_lm_2017 <-
+  lc_lm_2017 %>% 
+  filter(type %in% c("step", "hinge")) %>% 
+  mutate(coefs = map(model, tidy.chngpt)) %>% 
+  unnest(coefs) %>% 
+  select(-data, -model, -fit) %>% 
+  #joins to null and line models
+  left_join(lc_lm_2017, .) %>%
+  #set AIC to very high if the threshold CI overlaps zero
+  mutate(AIC = if_else(chngpt.lower.CI > min(lc2017_scaled$log_damage) | is.na(chngpt.lower.CI), AIC, Inf)) %>%
+  mutate(AIC = if_else(chngpt.upper.CI < max(lc2017_scaled$log_damage) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  group_by(compound) 
+
+
+lc_lm_2017
 ```
 ```{r}
 119.83-122.28
+63.38 - 64.47
 ```
 
 Choose best fit manually by AIC:
 
-- Caffeine: linear
-- Epicatechin gallate: null (step threshold overlaps zero)
+- Caffeine: null
+- Epicatechin gallate: step
 - Epigallocatechin gallate: linear
-- Theobromine: null (step threshold overlaps zero)
+- Theobromine: step
 
 Check that changepoint doesn't overlap zero
 
@@ -230,17 +289,17 @@ Check that changepoint doesn't overlap zero
 lc_lm_2017 <-
   lc_lm_2017 %>% 
   ungroup() %>% 
-  filter(compound == "Caffeine" & type == "linear" |
-           compound == "Epicatechin gallate" & type == "null" |
+  filter(compound == "Caffeine" & type == "null" |
+           compound == "Epicatechin gallate" & type == "step" |
            compound == "Epigallocatechin gallate" & type == "linear" |
-           compound == "Theobromine" & type == "null")
+           compound == "Theobromine" & type == "step")
 ```
 
 
 In all cases the linear model was a better fit than quadratic, so I'm just going with linear.
 
 ```{r}
-full_join(lc_biomarkers_2017, lc_lm_2017)
+lc_biomarkers_2017 <- full_join(lc_biomarkers_2017, lc_lm_2017)
 ```
 
 ## Plots
@@ -251,13 +310,25 @@ lc_plotdata.2017 <-
   mutate(compound = fct_reorder(compound, abs(loading), .desc = TRUE))
   
 lc_plot.2017 <-
-  ggplot(lc_plotdata.2017, aes(x = mean_percent_damage, y = conc_ug_mg)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE, data = lc_plotdata.2017 %>% filter(compound %in% c("Epigallocatechin gallate", "Caffeine")), color = "black", size = 0.5, linetype = 1) +
+  ggplot(lc_plotdata.2017, aes(x = log_damage, y = conc_ug_mg)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              data = lc_plotdata.2017 %>% 
+                filter(compound %in% c("Epigallocatechin gallate")),
+              color = "black", size = 0.5, linetype = 1) +
+   #step
+  geom_segment(aes(x = min(log_damage),
+                 xend = chngpt,
+                 y = `(Intercept)`,
+                 yend = `(Intercept)`), color = "black") +
+  geom_segment(aes(x = chngpt,
+                   xend = max(log_damage),
+                   y = `(Intercept)`+`I(log_damage>chngpt)`, 
+                   yend = `(Intercept)`+`I(log_damage>chngpt)`), color = "black") +
   facet_wrap(~compound, scales = "free_y") +
   theme_bw() +
-  theme(legend.position = "none") +
-  labs(x = "Mean % leaf damage",
+  labs(x = "ln(mean % leaf damage)",
        y = "Concentration (µg/mg)")
 lc_plot.2017
 ```
@@ -348,17 +419,17 @@ rda_dens_jgy <-
       data = lc_jgy)
 
 rda_dam_jgy <- 
-  rda(lc_jgy %>% select(Caffeine:Theobromine) ~ mean_percent_damage,
+  rda(lc_jgy %>% select(Caffeine:Theobromine) ~ log_damage,
       data = lc_jgy)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda_dens_jgy)
-MVA.synt(rda_dam_jgy)
+MVA.synt(rda_dens_jgy)[[1]][[2]]
+MVA.synt(rda_dam_jgy)[[1]][[2]]
 ```
-
+Very small numbers here.
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -366,6 +437,7 @@ MVA.synt(rda_dam_jgy)
 anova(rda_dens_jgy)
 anova(rda_dam_jgy)
 ```
+Definitely not significant
 
 ## Long Jing
 
@@ -377,17 +449,17 @@ rda_dens_lj <-
       data = lc_lj)
 
 rda_dam_lj <- 
-  rda(lc_lj %>% select(Caffeine:Theobromine) ~ mean_percent_damage,
+  rda(lc_lj %>% select(Caffeine:Theobromine) ~ log_damage,
       data = lc_lj)
 ```
 
 2. How much total variance does the experimental design explain?
 
 ```{r}
-MVA.synt(rda_dens_lj)
-MVA.synt(rda_dam_lj)
+MVA.synt(rda_dens_lj)[[1]][[2]]
+MVA.synt(rda_dam_lj)[[1]][[2]]
 ```
-
+~ 6-7% for both
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -396,12 +468,4 @@ anova(rda_dens_lj)
 anova(rda_dam_lj)
 ```
 
-Highly significant global effect
-
-4. Then we test for significance of individual factors and interaction terms:
-
-```{r}
-MVA.anova(rda.2018.dens)
-```
-
-Significant effect of cultivar, no effect of density
+not significant
