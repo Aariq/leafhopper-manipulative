@@ -120,18 +120,26 @@ gc_wide.logscale <-
   mutate_at(vars(-metavars), scale) %>%
   #strip atrributes left by scale() that interfere with some other functions down the road
   mutate_at(vars(-metavars), rm_attr) %>% 
+  #also log-transform leaf damage
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage)) %>% 
   #remove outlier found in wrangling script.
   filter(sample != "Q8")
 
 gc_tidy <-
   gc_tidy %>%
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage)) %>% 
   filter(sample != "Q8")
 
+#update list of columns that aren't RPAs
+metavars <- c(metavars, "log.twister", "log.mean_damage")
 #set up chemistry data for RDA
 chemdata <-
   gc_wide.logscale %>% 
   select(-metavars) %>%
   as.data.frame()
+
 rownames(chemdata) <- gc_wide.logscale$sample
 ```
 
@@ -211,7 +219,7 @@ Significant effect of ending density on leaf volatiles
 ### Fit RDA
 
 ```{r}
-rda_dam <- rda(chemdata ~ gc_wide.logscale$mean_percent_damage)
+rda_dam <- rda(chemdata ~ gc_wide.logscale$log.mean_damage)
 ```
 
 ### How much total variance does the experimental design explain?
@@ -220,7 +228,9 @@ rda_dam <- rda(chemdata ~ gc_wide.logscale$mean_percent_damage)
 synt_dam <- MVA.synt(rda_dam)
 synt_dam[[1]][[2]]
 ```
-5.53%
+~~5.53%~~
+
+**UPDATE**: 6.61% when log-transformed leaf damage used
 
 ### ANOVA
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
@@ -235,22 +245,23 @@ Not significant
 ### Fit RDA
 
 ```{r}
-rda_dam <- rda(chemdata ~ gc_wide.logscale$twister_damage)
+rda_t <- rda(chemdata ~ gc_wide.logscale$log.twister)
 ```
 
 ### How much total variance does the experimental design explain?
 
 ```{r}
-synt_dam <- MVA.synt(rda_dam)
-synt_dam[[1]][[2]]
+synt_t <- MVA.synt(rda_t)
+synt_t[[1]][[2]]
 ```
-7.94%
+~~7.94%~~
+**UPDATE**: 7.67% when log-transformed twiter damage used
 
 ### ANOVA
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
-anova(rda_dam)
+anova(rda_t)
 ```
 
 Marginally significant? Not sure if should report biomarkers.
@@ -424,8 +435,8 @@ write_excel_csv(table1, here("figs", "2017 density biomarkers.csv"), na = "-")
 ### Extract scores and loadings
 
 ```{r}
-dam_scores <- scores(rda_dam, display = "sites", scaling = 0) %>% as_tibble(rownames = "sample")
-dam_loads <- scores(rda_dam, display = "species", scaling = 0) %>% as_tibble(rownames = "compound")
+dam_scores <- scores(rda_t, display = "sites", scaling = 0) %>% as_tibble(rownames = "sample")
+dam_loads <- scores(rda_t, display = "species", scaling = 0) %>% as_tibble(rownames = "compound")
 ```
 
 ### Correlation with RDA axis
@@ -466,10 +477,10 @@ dam_univar <-
   nest() %>% 
   #fit null, linear, step, and hing models
   mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
-         line = map(data, ~lm(log.RPA ~ twister_damage, data = .x)),
-         step = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage,
+         line = map(data, ~lm(log.RPA ~ log.twister, data = .x)),
+         step = map(data, ~chngptm(log.RPA ~ 1, ~ log.twister,
                                    family = "gaussian", type = "step", data = .x, var.type = "bootstrap", ci.bootstrap.size = 100)),
-         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ twister_damage, 
+         hinge = map(data, ~chngptm(log.RPA ~ 1, ~ log.twister, 
                                     family = "gaussian", type = "hinge", data = .x))) %>% 
   gather(-compound, -data, key = type, value = model) %>% 
   #extract winning glm from step and hing models
@@ -493,7 +504,7 @@ dam_univar2 <-
   left_join(dam_univar, .) %>%
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
-  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$twister_damage) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$log.twister) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
@@ -502,8 +513,8 @@ dam_univar2 <-
 ```{r}
 dam_univar_out <-
   dam_univar2 %>% 
-  mutate(estimate = case_when(type == "step"  ~ `I(twister_damage>chngpt)` - `(Intercept)`,
-                              type == "hinge" ~ `(twister_damage-chngpt)+`,
+  mutate(estimate = case_when(type == "step"  ~ `I(log.twister>chngpt)` - `(Intercept)`,
+                              type == "hinge" ~ `(log.twister-chngpt)+`,
                               type == "line"  ~ map_dbl(fit, ~coef(.x)[2]))) %>% 
   select(compound, type, estimate, threshold = chngpt)
 ```
@@ -620,7 +631,7 @@ dam_justlm <- dam_plotdata %>% filter(type == "line")
 
 ```{r}
 dam_plot <- 
-  ggplot(dam_plotdata, aes(x = twister_damage, y = log.RPA)) +
+  ggplot(dam_plotdata, aes(x = log.twister, y = log.RPA)) +
   geom_point(alpha = 0.5) +
   geom_segment(aes(x = 0,
                  xend = chngpt,
@@ -628,14 +639,14 @@ dam_plot <-
                  yend = `(Intercept)`), color = "black") +
   #step
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$twister_damage),
-                   y = `(Intercept)`+`I(twister_damage>chngpt)`, 
-                   yend = `(Intercept)`+`I(twister_damage>chngpt)`), color = "black") +
+                   xend = max(gc_tidy$log.twister),
+                   y = `(Intercept)`+`I(log.twister>chngpt)`, 
+                   yend = `(Intercept)`+`I(log.twister>chngpt)`), color = "black") +
   #hinge
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$twister_damage),
+                   xend = max(gc_tidy$log.twister),
                    y = `(Intercept)`,
-                   yend = `(Intercept)` + `(twister_damage-chngpt)+` * (max(gc_tidy$twister_damage) - chngpt))) +
+                   yend = `(Intercept)` + `(log.twister-chngpt)+` * (max(gc_tidy$log.twister) - chngpt))) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dam_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +

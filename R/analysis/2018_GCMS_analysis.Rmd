@@ -113,6 +113,9 @@ gc_wide.logscale <-
   gc_wide %>% 
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
+  #also log-transform leaf damage
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage)) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
   mutate_at(vars(-metavars), rm_attr)
 ```
@@ -171,7 +174,9 @@ gc_jgy <-
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
+  mutate_at(vars(-metavars), rm_attr) %>% 
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage))
 gc_jgy.t <-   
   gc_wide %>% 
   filter(cultivar == "J") %>% 
@@ -179,14 +184,18 @@ gc_jgy.t <-
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
+  mutate_at(vars(-metavars), rm_attr) %>% 
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage))
 gc_lj <- 
   gc_wide %>% 
   filter(cultivar == "L") %>% 
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
+  mutate_at(vars(-metavars), rm_attr) %>% 
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage))
 gc_lj.t <- 
   gc_wide %>% 
   filter(cultivar == "L") %>% 
@@ -194,7 +203,12 @@ gc_lj.t <-
   mutate_at(vars(-metavars), log) %>%
   mutate_at(vars(-metavars), scale) %>% 
   #strip atrributes left by scale() that interfere with some other functions down the road
-  mutate_at(vars(-metavars), rm_attr)
+  mutate_at(vars(-metavars), rm_attr) %>% 
+  mutate(log.twister = log(twister_damage),
+         log.mean_damage = log(mean_percent_damage))
+
+#update list of variables that aren't RPAs
+metavars <- c(metavars, "log.twister", "log.mean_damage")
 ```
 
 ## Jin Guan Yin
@@ -206,11 +220,11 @@ rda_jgy_dens <-
       data = gc_jgy)
 
 rda_jgy_dam <-
-  rda(gc_jgy %>% select(-metavars) ~ mean_percent_damage,
+  rda(gc_jgy %>% select(-metavars) ~ log.mean_damage,
       data = gc_jgy)
 
 rda_jgy_t <- 
-  rda(gc_jgy.t %>% select(-metavars) ~ twister_damage,
+  rda(gc_jgy.t %>% select(-metavars) ~ log.twister,
       data = gc_jgy.t)
 ```
 
@@ -225,7 +239,7 @@ MVA.synt(rda_jgy_dam)[[1]][[2]]
 MVA.synt(rda_jgy_t)[[1]][[2]]
 ```
 
-All proxies of herbivory explain < 7% of variation in volatiles
+All proxies of herbivory explain < 6% of variation in volatiles
 
 ### Anovas
 
@@ -252,11 +266,11 @@ rda_lj_dens <-
       data = gc_lj)
 
 rda_lj_dam <-
-  rda(gc_lj %>% select(-metavars) ~ mean_percent_damage,
+  rda(gc_lj %>% select(-metavars) ~ log.mean_damage,
       data = gc_lj)
 
 rda_lj_t <-
-  rda(gc_lj.t %>% select(-metavars) ~ mean_percent_damage,
+  rda(gc_lj.t %>% select(-metavars) ~ log.twister,
       data = gc_lj.t)
 ```
 

@@ -1,26 +1,23 @@
 ﻿Compound,CAS,RDA Loading,Correlation,Response type,Response estimate,Change point,Chemical Family,Aroma
-1-Hexanol,111-27-3,0.2,0.801***,line,0.166,-,Aliphatic alcohol,"resin, flower, green"
-(3Z)-Hexenyl hexanoate,31501-11-8,0.175,0.768***,line,0.15,-,Fatty acid ester,"green, fruity, fatty, tropical"
-cis-3-Hexenyl isovalerate,35154-45-1,0.199,0.727***,step,10.545,8.541,Fatty acid ester,"fresh, green, apple, fruity, tropical, pineapple, dirty"
-(Z)-2-Hexenol,928-94-9,0.175,0.663**,line,0.138,-,Alkenyl alcohol,"leaf, green, wine, fruit"
-Coumaran,496-16-2,0.162,0.651**,hinge,0.167,8.541,Heterocyclic compound,-
-"cis-Butyric acid, 3-hexenyl ester",16491-36-4,0.155,0.645**,line,0.134,-,Fatty acid ester,"wine, green"
-ɣ-Nonalactone,104-61-0,0.145,0.629**,line,0.089,-,Heterocyclic compound,"coconut, creamy, waxy, sweet, buttery, oily"
-Benzyl alcohol,100-51-6,0.15,0.625**,step,7.916,2.4,Cyclic alcohol,"fruity, floral, sweet"
-Methyl salicylate,119-36-8,0.176,0.62**,line,0.073,-,Heterocyclic compound,wintergreen
-Benzothiazole,95-16-9,0.149,0.617**,line,0.077,-,Nitrogen sulfur containing,"rubbery, sulfury, vegetal, gasoline"
-Phenethyl alcohol,60-12-8,0.172,0.6**,line,0.147,-,Aromatic alcohol,"honey, spice, rose, lilac"
-Isopropyl tetradecanoate,110-27-0,0.113,0.594**,line,0.02,-,Ester,"fatty, oily"
-"(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,0.124,0.59**,null,-,-,Aliphatic ester,-
-"10,18-Bisnorabieta-8,11,13-triene",32624-67-2,0.222,0.584*,line,0.06,-,Hydrocarbon,-
-Isovaleric acid,503-74-2,-0.118,-0.564*,step,2.867,4.206,Acid,"sour, cheesy, rancid"
-cis-Methyl dihydrojasmonate,39647-11-5,-0.185,-0.553*,line,-0.105,-,Cyclic ester,"jasmine, floral, green"
-"N,N-Dibutylformamide",761-65-9,0.106,0.533*,null,-,-,Nitrogen containing,-
-Diendiol I,13741-21-4,0.144,0.527*,line,0.116,-,Oxygenated monoterpene,-
-Benzoic acid,65-85-0,0.06,0.5*,null,-,-,Acid,"balsam, faint, urine"
-Phenylacetaldehyde,122-78-1,0.125,0.488*,null,-,-,Cyclic aldehyde,"floral, honey, sweet"
-Mesityl oxide,141-79-7,0.06,0.481*,null,-,-,Aliphatic ketone,"acrylic, earthy, sweet, chemical"
-Ethyl benzoate,93-89-0,0.087,0.48*,null,-,-,Cyclic ester,"sweet, wintergreen, fruity, medicinal"
-o-Hydroxybiphenyl,90-43-7,0.093,0.476*,null,-,-,Aromatic compound,-
-Decanoic acid,334-48-5,0.147,0.474*,line,0.15,-,Acid,"fatty, sour, rancid"
-cis-Linalool oxide (pyranoid),14009-71-3,0.109,0.472*,null,-,-,Oxygenated monoterpene,"citrus, green"
+1-Hexanol,111-27-3,-0.209,-0.844***,step,11.012,1.436,Aliphatic alcohol,"resin, flower, green"
+(3Z)-Hexenyl hexanoate,31501-11-8,-0.195,-0.827***,line,0.842,-,Fatty acid ester,"green, fruity, fatty, tropical"
+cis-3-Hexenyl isovalerate,35154-45-1,-0.213,-0.784***,line,0.778,-,Fatty acid ester,"fresh, green, apple, fruity, tropical, pineapple, dirty"
+Benzyl alcohol,100-51-6,-0.186,-0.759***,line,0.554,-,Cyclic alcohol,"fruity, floral, sweet"
+Phenethyl alcohol,60-12-8,-0.208,-0.713***,line,0.897,-,Aromatic alcohol,"honey, spice, rose, lilac"
+"cis-Butyric acid, 3-hexenyl ester",16491-36-4,-0.18,-0.684**,line,0.782,-,Fatty acid ester,"wine, green"
+(Z)-2-Hexenol,928-94-9,-0.174,-0.634**,line,0.688,-,Alkenyl alcohol,"leaf, green, wine, fruit"
+Isovaleric acid,503-74-2,0.166,0.634**,step,2.867,1.436,Acid,"sour, cheesy, rancid"
+Diendiol I,13741-21-4,-0.173,-0.632**,line,0.698,-,Oxygenated monoterpene,-
+cis-Linalool oxide (pyranoid),14009-71-3,-0.149,-0.616**,line,0.553,-,Oxygenated monoterpene,"citrus, green"
+"(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,-0.122,-0.579*,null,-,-,Aliphatic ester,-
+Benzothiazole,95-16-9,-0.135,-0.574*,null,-,-,Nitrogen sulfur containing,"rubbery, sulfury, vegetal, gasoline"
+ɣ-Nonalactone,104-61-0,-0.125,-0.558*,null,-,-,Heterocyclic compound,"coconut, creamy, waxy, sweet, buttery, oily"
+Indole,120-72-9,-0.091,-0.536*,null,-,-,Nitrogen containing,"concentrated = fecal, animal; dilute = sweet, floral"
+Coumaran,496-16-2,-0.12,-0.522*,line,0.386,-,Heterocyclic compound,-
+cis-Linalool oxide (furanoid),5989-33-3,-0.118,-0.518*,null,-,-,Oxygenated monoterpene,"earthy, floral, sweet, woody"
+trans-Linalool oxide (furanoid),5989-33-3,-0.105,-0.511*,null,-,-,Oxygenated monoterpene,"earthy, floral, sweet, woody"
+"1,2,4-Trimethylbenzene",95-63-6,0.147,0.499*,line,-0.169,-,Hydrocarbon,plastic
+o-Hydroxybiphenyl,90-43-7,-0.097,-0.489*,null,-,-,Aromatic compound,-
+Methyl salicylate,119-36-8,-0.14,-0.476*,line,0.292,-,Heterocyclic compound,wintergreen
+cis-Methyl dihydrojasmonate,39647-11-5,0.162,0.469*,line,-0.461,-,Cyclic ester,"jasmine, floral, green"
+Benzyl nitrile,140-29-4,-0.103,-0.469*,null,-,-,Nitrogen containing,-
