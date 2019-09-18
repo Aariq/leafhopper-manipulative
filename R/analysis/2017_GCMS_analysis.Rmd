@@ -95,11 +95,18 @@ bestAIC <- function(AIC){
 #Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
 tidy.chngpt <- function(chngpt.mod) {
   df <- bind_cols(
-    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
-    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
-  )
+    chngpt.mod$coefficients[1:2] %>%
+      t() %>%
+      as_tibble(),
+    summary(chngpt.mod)$chngpt %>% 
+      set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>%
+      t() %>% 
+      as_tibble()
+  ) %>% 
+    add_column(coef.p.value = summary(chngpt.mod)$coefficients[2,2])
   return(df)
 }
+
 ```
 
 
@@ -359,6 +366,8 @@ dens_univar2 <-
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
   mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$density_end) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  #set AIC to very high if coefficient isn't significantly different from zero
+  mutate(AIC = if_else(coef.p.value > 0.05, Inf, AIC,missing = AIC)) %>% 
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
@@ -505,6 +514,8 @@ dam_univar2 <-
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
   mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$log.twister) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  #set AIC to very high if coefficient isn't significantly different from zero
+  mutate(AIC = if_else(coef.p.value > 0.05, Inf, AIC,missing = AIC)) %>% 
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
@@ -633,24 +644,24 @@ dam_justlm <- dam_plotdata %>% filter(type == "line")
 dam_plot <- 
   ggplot(dam_plotdata, aes(x = log.twister, y = log.RPA)) +
   geom_point(alpha = 0.5) +
-  geom_segment(aes(x = 0,
+  geom_segment(aes(x = min(log.twister),
                  xend = chngpt,
                  y = `(Intercept)`,
                  yend = `(Intercept)`), color = "black") +
   #step
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$log.twister),
+                   xend = max(log.twister),
                    y = `(Intercept)`+`I(log.twister>chngpt)`, 
                    yend = `(Intercept)`+`I(log.twister>chngpt)`), color = "black") +
   #hinge
   geom_segment(aes(x = chngpt,
-                   xend = max(gc_tidy$log.twister),
+                   xend = max(log.twister),
                    y = `(Intercept)`,
                    yend = `(Intercept)` + `(log.twister-chngpt)+` * (max(gc_tidy$log.twister) - chngpt))) +
   #line
   geom_smooth(method = "lm", se = FALSE, color = "black", data = dam_justlm, size = 0.5) +
   facet_wrap(~pretty_name, scales = "free_y") +
-  labs(x = "% damage to focal leaf",
+  labs(x = "ln(% damage to focal leaf)",
        y = "ln(relative peak area)") +
   theme_bw()
 dam_plot

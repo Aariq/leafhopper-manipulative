@@ -24,9 +24,9 @@ Decanal,112-31-2,0.063,0.569*,null,-,-,Aliphatic aldehyde,"citrus, sweet, waxy"
 Cyclopentenone,930-30-3,0.091,0.54*,null,-,-,Cyclic ketone,-
 trans-Linalool oxide (furanoid),5989-33-3,-0.104,-0.513*,null,-,-,Oxygenated monoterpene,"earthy, floral, sweet, woody"
 ɣ-Nonalactone,104-61-0,-0.122,-0.508*,step,9.411,0.579,Heterocyclic compound,"coconut, creamy, waxy, sweet, buttery, oily"
-ɣ-Butyrolactone,96-48-0,0.096,0.507*,step,4.725,0.625,Heterocyclic compound,"caramel, fatty, sweet"
+ɣ-Butyrolactone,96-48-0,0.096,0.507*,null,-,-,Heterocyclic compound,"caramel, fatty, sweet"
 2,-,0.1,0.494*,null,-,-,-,-
-p-Xylene,106-42-3,-0.115,-0.493*,line,2.198,-,Hydrocarbon,sweet
+p-Xylene,106-42-3,-0.115,-0.493*,null,-,-,Hydrocarbon,sweet
 1-Octen-3-ol,3391-86-4,0.086,0.493*,null,-,-,Aliphatic alcohol,"earthy, green, vegetative, mushroom"
 Benzyl nitrile,140-29-4,-0.066,-0.491*,null,-,-,Nitrogen containing,-
 Octanoic acid,124-07-2,0.079,0.488*,null,-,-,Fatty acid,"cheesy, fatty, waxy"
