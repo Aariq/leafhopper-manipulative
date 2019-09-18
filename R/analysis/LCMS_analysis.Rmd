@@ -13,7 +13,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-options(scipen =999) #turn off scientific notation
+# options(scipen =999) #turn off scientific notation
 ```
 
 *Last compiled: `r Sys.Date()`*
@@ -208,16 +208,12 @@ anova(dam_rda.2017)
 ```
 Marginally significant effect of leaf damage on metabolites.
 
-5. Loadings
+### Get biomarkers for damage
 
 ```{r}
-# MVA.scores(dbrda_dens)
-
 scores <- MVA.scores(dam_rda.2017)$coord
 loads <- MVA.load(dam_rda.2017)$loads %>% rename(loading = `Constr. comp. 1`)
-
 data <- lc2017_scaled %>% select(Caffeine:Theobromine)
-
 
 lc_biomarkers_2017 <-
   map_df(data, ~cor.test(.x, scores[["Constr. comp. 1"]]) %>% broom::glance(), .id = "compound") %>%
@@ -269,19 +265,16 @@ lc_lm_2017 <-
   group_by(compound) 
 
 
-lc_lm_2017
+lc_lm_2017$model[[13]] %>% summary()
 ```
-```{r}
-119.83-122.28
-63.38 - 64.47
-```
+
 
 Choose best fit manually by AIC:
 
 - Caffeine: null
-- Epicatechin gallate: step
+- Epicatechin gallate: step is best fit, but not significant, so null
 - Epigallocatechin gallate: linear
-- Theobromine: step
+- Theobromine: step is best fit, but not significant, same with hinge, linear is marginally significant
 
 Check that changepoint doesn't overlap zero
 
@@ -290,9 +283,9 @@ lc_lm_2017 <-
   lc_lm_2017 %>% 
   ungroup() %>% 
   filter(compound == "Caffeine" & type == "null" |
-           compound == "Epicatechin gallate" & type == "step" |
+           compound == "Epicatechin gallate" & type == "null" |
            compound == "Epigallocatechin gallate" & type == "linear" |
-           compound == "Theobromine" & type == "step")
+           compound == "Theobromine" & type == "linear")
 ```
 
 
@@ -315,17 +308,17 @@ lc_plot.2017 <-
   geom_smooth(method = "lm",
               se = FALSE,
               data = lc_plotdata.2017 %>% 
-                filter(compound %in% c("Epigallocatechin gallate")),
+                filter(compound %in% c("Epigallocatechin gallate", "Theobromine")),
               color = "black", size = 0.5, linetype = 1) +
-   #step
-  geom_segment(aes(x = min(log_damage),
-                 xend = chngpt,
-                 y = `(Intercept)`,
-                 yend = `(Intercept)`), color = "black") +
-  geom_segment(aes(x = chngpt,
-                   xend = max(log_damage),
-                   y = `(Intercept)`+`I(log_damage>chngpt)`, 
-                   yend = `(Intercept)`+`I(log_damage>chngpt)`), color = "black") +
+  #  #step
+  # geom_segment(aes(x = min(log_damage),
+  #                xend = chngpt,
+  #                y = `(Intercept)`,
+  #                yend = `(Intercept)`), color = "black") +
+  # geom_segment(aes(x = chngpt,
+  #                  xend = max(log_damage),
+  #                  y = `(Intercept)`+`I(log_damage>chngpt)`, 
+  #                  yend = `(Intercept)`+`I(log_damage>chngpt)`), color = "black") +
   facet_wrap(~compound, scales = "free_y") +
   theme_bw() +
   labs(x = "ln(mean % leaf damage)",
