@@ -82,7 +82,6 @@ shapiro.test(tp2017$mg_g_gae)
 I'm going to apply the same models as I do for LCMS and GCMS compounds: null, linear, step, and hinge.  Then select the best fit by AIC
 
 ```{r}
-# dens.poly.17 <- lm(mg_g_gae ~ poly(density_end, 2), data = tp2017)
 dens.linear.17 <- lm(mg_g_gae ~ density_end, data = tp2017)
 dens.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
 dens.step.17 <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "step", family = "gaussian", data = tp2017,
@@ -91,9 +90,10 @@ dens.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "hinge", family = "
 
 bbmle::AICtab(dens.linear.17, dens.null.17, dens.step.17$best.fit, dens.hinge.17$best.fit)
 summary(dens.step.17)
+summary(dens.hinge.17)
 ```
 
-Step model wins
+Step model wins, but change in intercept isn't significantly different from zero.  Next is hinge, but slope isn't significant.  Null is next best.
 
 ```{r eval=FALSE, include=FALSE}
 ggplot(augment(dens.step.17$best.fit), aes(.resid)) + geom_histogram(bins = 15)
@@ -104,14 +104,14 @@ ggplot(augment(dens.step.17$best.fit), aes(sample = .resid)) + geom_qq() + geom_
 dens.2017.plot <-
   ggplot(tp2017, aes(x = density_end, y = mg_g_gae)) +
   geom_point(alpha = 0.75) +
-  geom_segment(aes(x = min(density_end),
-                   xend = dens.step.17$chngpt,
-                   y = dens.step.17$coefficients[1],
-                   yend = dens.step.17$coefficients[1])) +
-  geom_segment(aes(x = dens.step.17$chngpt,
-                   xend = max(density_end),
-                   y = dens.step.17$coefficients[1] + dens.step.17$coefficients[2],
-                   yend = dens.step.17$coefficients[1] + dens.step.17$coefficients[2])) +
+  # geom_segment(aes(x = min(density_end),
+  #                  xend = dens.step.17$chngpt,
+  #                  y = dens.step.17$coefficients[1],
+  #                  yend = dens.step.17$coefficients[1])) +
+  # geom_segment(aes(x = dens.step.17$chngpt,
+  #                  xend = max(density_end),
+  #                  y = dens.step.17$coefficients[1] + dens.step.17$coefficients[2],
+  #                  yend = dens.step.17$coefficients[1] + dens.step.17$coefficients[2])) +
   labs(x = "Final leahopper density (insects / young leaf)",
        y = "Total polyphenols (mg/g GAE)",
        # caption = "Sample Q2 removed",
@@ -132,28 +132,32 @@ dam.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "ga
 
 bbmle::AICtab(dam.linear.17, dam.null.17, dam.step.17$best.fit, dam.hinge.17$best.fit)
 summary(dam.hinge.17)
+summary(dam.step.17)
+summary(dam.linear.17)
 coefficients(dam.hinge.17)
 dam.hinge.17$coefficients[2]*dam.hinge.17$coefficients[1]
 ```
-Now, the hinge model is the best.
+Now, the hinge model is the best, but the slope is not significant, same for step.  Linear is sigificant though
 
 
 ```{r echo=FALSE}
 dam.2017.plot <-
   ggplot(tp2017, aes(x = log_damage, y = mg_g_gae)) +
   geom_point(alpha = 0.75) +
-  #hinge
-  geom_segment(aes(x = min(log_damage),
-                   xend = dam.hinge.17$chngpt,
-                   y = dam.hinge.17$coefficients[1],
-                   yend = dam.hinge.17$coefficients[1])) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", size = 0.5) +
+  # #hinge
+  # geom_segment(aes(x = min(log_damage),
+  #                  xend = dam.hinge.17$chngpt,
+  #                  y = dam.hinge.17$coefficients[1],
+  #                  yend = dam.hinge.17$coefficients[1])) +
+
+  # geom_segment(aes(x = dam.hinge.17$chngpt,
+  #                  xend = max(log_damage),
+  #                  y = dam.hinge.17$coefficients[1],
+                   # yend = dam.hinge.17$coefficients[1] + dam.hinge.17$coefficients[2])) +
   labs(x = "ln(mean % damaged leaf area)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2017") +
-  geom_segment(aes(x = dam.hinge.17$chngpt,
-                   xend = max(log_damage),
-                   y = dam.hinge.17$coefficients[1],
-                   yend = dam.hinge.17$coefficients[1] + dam.hinge.17$coefficients[2])) +
   theme_bw() #+
 dam.2017.plot
 ```
@@ -209,26 +213,28 @@ dens.lj.hinge <- chngptm(mg_g_gae ~ 1, ~ density_end, type = "hinge", family = "
 
 bbmle::AICtab(dens.lj.lm, dens.lj.null, dens.lj.step$best.fit, dens.lj.hinge$best.fit)
 summary(dens.lj.step)
+summary(dens.lj.hinge)
+summary(dens.lj.lm)
 ```
 
-Step model wins
+Step model wins, but change in intercept is not significant.  Same with hinge, same with linear, so null wins?
 
 ```{r}
 #TODO add in step function line for longjing
 dens.2018.plot <-
   ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
   geom_point(alpha = 0.75) +
-  # step for longjing
-  geom_segment(aes(x = min(density_end),
-                   xend = dens.lj.step$chngpt,
-                   y = dens.lj.step$coefficients[1],
-                   yend = dens.lj.step$coefficients[1]),
-               color = "darkgreen") +
-  geom_segment(aes(x = dens.lj.step$chngpt,
-                   xend = max(density_end),
-                   y = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2],
-                   yend = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2]),
-               color = "darkgreen") +
+  # # step for longjing
+  # geom_segment(aes(x = min(density_end),
+  #                  xend = dens.lj.step$chngpt,
+  #                  y = dens.lj.step$coefficients[1],
+  #                  yend = dens.lj.step$coefficients[1]),
+  #              color = "darkgreen") +
+  # geom_segment(aes(x = dens.lj.step$chngpt,
+  #                  xend = max(density_end),
+  #                  y = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2],
+  #                  yend = dens.lj.step$coefficients[1] + dens.lj.step$coefficients[2]),
+  #              color = "darkgreen") +
   labs(x = "Final leafhopper density (insects / shoot)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +
