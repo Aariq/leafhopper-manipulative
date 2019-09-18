@@ -103,7 +103,7 @@ ggplot(augment(dens.step.17$best.fit), aes(sample = .resid)) + geom_qq() + geom_
 ```{r echo=FALSE}
 dens.2017.plot <-
   ggplot(tp2017, aes(x = density_end, y = mg_g_gae)) +
-  geom_point(alpha = 0.75) +
+  geom_point(alpha = 0.75, size = 2) +
   # geom_segment(aes(x = min(density_end),
   #                  xend = dens.step.17$chngpt,
   #                  y = dens.step.17$coefficients[1],
@@ -127,15 +127,19 @@ dens.2017.plot
 dam.linear.17 <- lm(mg_g_gae ~ log_damage, data = tp2017)
 dam.null.17 <- lm(mg_g_gae ~ 1, data = tp2017)
 dam.step.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "step", family = "gaussian", data = tp2017,
-                        var.type = "bootstrap", ci.bootstrap.size = 100)
-dam.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "gaussian", data = tp2017)
+                        var.type = "bootstrap", ci.bootstrap.size = 100, boot.test.inv.ci = TRUE)
+dam.hinge.17 <- chngptm(mg_g_gae ~ 1, ~ log_damage, type = "hinge", family = "gaussian", data = tp2017,
+                        var.type = "bootstrap", m.out.of.n = TRUE)
 
 bbmle::AICtab(dam.linear.17, dam.null.17, dam.step.17$best.fit, dam.hinge.17$best.fit)
 summary(dam.hinge.17)
+
 summary(dam.step.17)
+
+
 summary(dam.linear.17)
 coefficients(dam.hinge.17)
-dam.hinge.17$coefficients[2]*dam.hinge.17$coefficients[1]
+# dam.hinge.17$coefficients[2]*dam.hinge.17$coefficients[1]
 ```
 Now, the hinge model is the best, but the slope is not significant, same for step.  Linear is sigificant though
 
@@ -143,7 +147,7 @@ Now, the hinge model is the best, but the slope is not significant, same for ste
 ```{r echo=FALSE}
 dam.2017.plot <-
   ggplot(tp2017, aes(x = log_damage, y = mg_g_gae)) +
-  geom_point(alpha = 0.75) +
+  geom_point(alpha = 0.75, size = 2) +
   geom_smooth(method = "lm", se = FALSE, color = "black", size = 0.5) +
   # #hinge
   # geom_segment(aes(x = min(log_damage),
@@ -223,7 +227,7 @@ Step model wins, but change in intercept is not significant.  Same with hinge, s
 #TODO add in step function line for longjing
 dens.2018.plot <-
   ggplot(tp2018, aes(x = density_end, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
-  geom_point(alpha = 0.75) +
+  geom_point(alpha = 0.75, size = 2) +
   # # step for longjing
   # geom_segment(aes(x = min(density_end),
   #                  xend = dens.lj.step$chngpt,
@@ -275,7 +279,7 @@ The winning model is the null model
 ```{r}
 dam.2018.plot <-
   ggplot(tp2018, aes(x = log_damage, y = mg_g_gae, color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"))) +
-  geom_point(alpha = 0.75) +
+  geom_point(alpha = 0.75, size = 2) +
   labs(x = "ln(mean % damaged leaf area)",
        y = "Total polyphenols (mg/g GAE)",
        title = "2018") +

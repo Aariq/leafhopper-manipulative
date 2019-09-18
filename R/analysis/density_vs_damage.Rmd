@@ -91,7 +91,7 @@ damage2017 <- damage2017 %>% filter(sample != "Q2")
 #re-make plot
 dens_dam_2017 <-
   ggplot(damage2017, aes(x = density_end, y = mean_percent_damage, label = sample)) +
-  geom_point() +
+  geom_point(size = 2, alpha = 0.75) +
   labs(x = "Final leafhopper density (insects / young leaf)",
        y = "Mean % damaged leaf area",
        subtitle = "2017") +
@@ -143,11 +143,13 @@ dens_dam_2018 <-
          aes(x = density_end, y = mean_percent_damage,
              color = fct_relevel(cultivar, "L"), shape = fct_relevel(cultivar, "L"),
              label = sample)) +
-  geom_point() +
+  geom_point(size = 2, alpha = 0.75) +
   labs(x = "Final leafhopper density (insects / shoot)",
        y = "Mean % damaged leaf area",
        subtitle = "2018") +
-  scale_color_discrete(name = "Cultivar", labels = c("L" = "LJ", "J" = "JGY")) +
+  # scale_color_discrete(name = "Cultivar", labels = c("L" = "LJ", "J" = "JGY")) +
+  scale_color_manual(name = "Cultivar", values = c("L" = "darkgreen", "J" = "purple"),
+                     labels = c("L" = "LJ", "J" = "JGY")) +
   scale_shape_discrete(name = "Cultivar", labels = c("L" = "LJ", "J" = "JGY")) +
   theme_bw()
 dens_dam_2018
@@ -212,7 +214,7 @@ leaf_examples <-
 ```{r}
 dens_vs_dam <-
   plot_grid(dens_dam_2017 + coord_cartesian(ylim = c(0, 12)),
-            dens_dam_2018 + coord_cartesian(ylim = c(0,12)) +
+            dens_dam_2018 + coord_cartesian(ylim = c(0, 12)) +
               theme(legend.position = "none"), labels = c("B", "C")) %>% 
   plot_grid(get_legend(dens_dam_2018), rel_widths = c(1, 0.1))
 
@@ -222,7 +224,8 @@ dens_dam_full <-
           labels = "A",
           rel_heights = c(0.75, 1))
 
-# dens_vs_dam
+dens_vs_dam
+dens_dam_full
 save_plot(here('figs', 'dam_dens_img.png'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
 ```
 
