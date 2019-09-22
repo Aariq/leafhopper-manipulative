@@ -91,7 +91,17 @@ NAs are non-detects.  I should replace them with 0 or a very small number.
 
 ```{r}
 vis_dat(lc2017)
+skimr::skim(lc2017)
 vis_dat(lc2018)
+
+min(lc2017_tidy$conc_ug_mg, na.rm = TRUE)
+ggplot(lc2017_tidy, aes((conc_ug_mg))) +
+  geom_histogram(bins = 5) +
+  facet_wrap(~compound, scales = "free_x")
+
+resid_m <- lm(log(conc_ug_mg) ~ density_end * compound, data = lc2017_tidy)
+shapiro.test(resid_m$residuals)
+qqnorm(resid_m$residuals);qqline(resid_m$residuals)
 ```
 
 
@@ -100,24 +110,25 @@ vis_dat(lc2018)
 
 lc2017_tidy <- 
   lc2017_tidy %>% 
-  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #not detected in any sample
-  mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg))
+  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #not detected in any sample
+  mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.001, conc_ug_mg))
 
 lc2017_2 <-
   lc2017 %>% 
-  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`, -`Gallic acid`, -`Theophylline`) #all zeroes
+  mutate_all(~ifelse(is.na(.), 0.001, .)) %>% 
+  # mutate_at(vars(Caffeine:Theobromine), log) %>% 
+  select(-`Catechin gallate`,  -`Theophylline`) #all zeroes
 
 # min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
 lc2018_tidy <-
   lc2018_tidy %>% 
-  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #all zeros for all samples
-  mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg)) 
+  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #all zeros for all samples
+  mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.001, conc_ug_mg)) 
 
 lc2018_2 <- 
   lc2018 %>% 
-  mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`, -Theophylline, -`Gallic acid`) #all zeroes
+  mutate_all(~ifelse(is.na(.), 0.001, .)) %>% 
+  select(-`Catechin gallate`) #all zeroes
 ```
 
 ## Scale and transform data
