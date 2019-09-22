@@ -378,7 +378,7 @@ Create a column that is the slope when linear, the slope after the threshold whe
 ```{r}
 dens_univar_out <-
   dens_univar2 %>% 
-  mutate(estimate = case_when(type == "step"  ~ `I(density_end>chngpt)` - `(Intercept)`,
+  mutate(estimate = case_when(type == "step"  ~ `I(density_end>chngpt)`,
                               type == "hinge" ~ `(density_end-chngpt)+`,
                               type == "line"  ~ map_dbl(fit, ~coef(.x)[2]))) %>% 
   select(compound, type, estimate, threshold = chngpt)
@@ -519,12 +519,14 @@ dam_univar2 <-
   group_by(compound) %>%
   # choose the best AIC as described above
   filter(AIC == bestAIC(AIC))
+
+# dam_univar %>% filter(compound =="Isovaleric acid", type == "step") %>% pull(model)
 ```
 
 ```{r}
 dam_univar_out <-
   dam_univar2 %>% 
-  mutate(estimate = case_when(type == "step"  ~ `I(log.twister>chngpt)` - `(Intercept)`,
+  mutate(estimate = case_when(type == "step"  ~ `I(log.twister>chngpt)`,
                               type == "hinge" ~ `(log.twister-chngpt)+`,
                               type == "line"  ~ map_dbl(fit, ~coef(.x)[2]))) %>% 
   select(compound, type, estimate, threshold = chngpt)

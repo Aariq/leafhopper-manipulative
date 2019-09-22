@@ -1,12 +1,12 @@
 ﻿Compound,CAS,RDA Loading,Correlation,Response type,Response estimate,Change point,Chemical Family,Aroma
-1-Hexanol,111-27-3,-0.209,-0.844***,step,11.012,1.436,Aliphatic alcohol,"resin, flower, green"
+1-Hexanol,111-27-3,-0.209,-0.844***,step,3.169,1.436,Aliphatic alcohol,"resin, flower, green"
 (3Z)-Hexenyl hexanoate,31501-11-8,-0.195,-0.827***,line,0.842,-,Fatty acid ester,"green, fruity, fatty, tropical"
 cis-3-Hexenyl isovalerate,35154-45-1,-0.213,-0.784***,line,0.778,-,Fatty acid ester,"fresh, green, apple, fruity, tropical, pineapple, dirty"
 Benzyl alcohol,100-51-6,-0.186,-0.759***,line,0.554,-,Cyclic alcohol,"fruity, floral, sweet"
 Phenethyl alcohol,60-12-8,-0.208,-0.713***,line,0.897,-,Aromatic alcohol,"honey, spice, rose, lilac"
-"cis-Butyric acid, 3-hexenyl ester",16491-36-4,-0.18,-0.684**,line,0.782,-,Fatty acid ester,"wine, green"
+cis-3-Hexenyl butyrate,16491-36-4,-0.18,-0.684**,line,0.782,-,Fatty acid ester,"wine, green"
 (Z)-2-Hexenol,928-94-9,-0.174,-0.634**,line,0.688,-,Alkenyl alcohol,"leaf, green, wine, fruit"
-Isovaleric acid,503-74-2,0.166,0.634**,step,2.867,1.436,Acid,"sour, cheesy, rancid"
+Isovaleric acid,503-74-2,0.166,0.634**,step,-2.662,1.436,Acid,"sour, cheesy, rancid"
 Diendiol I,13741-21-4,-0.173,-0.632**,line,0.698,-,Oxygenated monoterpene,-
 cis-Linalool oxide (pyranoid),14009-71-3,-0.149,-0.616**,line,0.553,-,Oxygenated monoterpene,"citrus, green"
 "(3-hydroxy-2,4,4-trimethylpentyl) 2-methylpropanoate",74367-34-3,-0.122,-0.579*,null,-,-,Aliphatic ester,-
