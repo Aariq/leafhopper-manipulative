@@ -100,24 +100,24 @@ vis_dat(lc2018)
 
 lc2017_tidy <- 
   lc2017_tidy %>% 
-  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #not detected in any sample
+  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #not detected in any sample
   mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg))
 
 lc2017_2 <-
   lc2017 %>% 
   mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`, -`Gallic acid`, -`Theophylline`) #all zeroes
+  select(-`Catechin gallate`, -`Theophylline`) #all zeroes
 
 # min(lc2018_tidy$conc_ug_mg, na.rm = TRUE)
 lc2018_tidy <-
   lc2018_tidy %>% 
-  filter(!compound %in% c("Catechin gallate", "Gallic acid", "Theophylline")) %>% #all zeros for all samples
+  filter(!compound %in% c("Catechin gallate", "Theophylline")) %>% #all zeros for all samples
   mutate(conc_ug_mg = ifelse(is.na(conc_ug_mg), 0.0001, conc_ug_mg)) 
 
 lc2018_2 <- 
   lc2018 %>% 
   mutate_all(~ifelse(is.na(.), 0.0001, .)) %>% 
-  select(-`Catechin gallate`, -Theophylline, -`Gallic acid`) #all zeroes
+  select(-`Catechin gallate`, -Theophylline) #all zeroes
 ```
 
 ## Scale and transform data
@@ -176,7 +176,7 @@ dens_rda.2017 <-
 MVA.synt(dens_rda.2017)[[1]][[2]]
 ```
 
-Only 5.19% variation explained
+Only 5.45% variation explained
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -199,7 +199,7 @@ dam_rda.2017 <-
 MVA.synt(dam_rda.2017)[[1]][[2]]
 ```
 
-9.21 % of variation explained
+9.58 % of variation explained
 
 3. Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -264,8 +264,9 @@ lc_lm_2017 <-
   mutate(AIC = if_else(chngpt.upper.CI < max(lc2017_scaled$log_damage) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
   group_by(compound) 
 
+lc_lm_2017
+# lc_lm_2017$model[[13]] %>% summary()
 
-lc_lm_2017$model[[13]] %>% summary()
 ```
 
 
@@ -289,7 +290,6 @@ lc_lm_2017 <-
 ```
 
 
-In all cases the linear model was a better fit than quadratic, so I'm just going with linear.
 
 ```{r}
 lc_biomarkers_2017 <- full_join(lc_biomarkers_2017, lc_lm_2017)
@@ -378,7 +378,7 @@ lc2018_scaled <-
   left_join(processing_time)
 
 rda.2018 <- 
-  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ mean_percent_damage*cultivar + Condition(as.numeric(time)),
+  rda(lc2018_scaled %>% select(Caffeine:Theobromine) ~ log_damage*cultivar + Condition(as.numeric(time)),
       data = lc2018_scaled)
 ```
 
