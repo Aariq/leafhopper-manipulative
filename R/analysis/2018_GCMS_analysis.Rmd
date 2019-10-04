@@ -276,3 +276,47 @@ anova(rda_lj_t)
 ```
 
 None are significant
+
+# Supplemental table
+Renumber unknowns by RI order
+```{r}
+meanRIs <-
+  gc_tidy %>% 
+  group_by(compound) %>% 
+  summarize(meanRI = mean(ri, na.rm = TRUE))
+
+annotations2 <- left_join(meanRIs, annotations.raw, by = "compound")
+  
+unks <-
+  annotations2 %>% 
+  filter(is.na(cas)) %>% 
+  arrange(meanRI) %>% 
+  add_column(unk_name = 1:nrow(.))
+
+annotations <- 
+  left_join(annotations2, unks) %>% 
+  mutate(pretty_name = ifelse(is.na(unk_name), pretty_name, unk_name)) %>% 
+  mutate(pretty_name = ifelse(is.na(pretty_name), compound, pretty_name)) %>% 
+  select(compound, cas, pretty_name, meanRI, ri_lab, ri_lit, source, aroma, chemical_family) %>% 
+  mutate(chemical_family = snakecase::to_sentence_case(chemical_family))
+```
+
+Cleanup
+```{r}
+s_table<-
+  annotations %>% 
+  mutate(RI_lab_lit = ifelse(is.na(ri_lab), ri_lit, ri_lab),
+         source2 = ifelse(!is.na(ri_lab), "standard", source)) %>% 
+  select(Compound = pretty_name, CAS = cas, RI = meanRI, RI_lab_lit, Source = source2) %>% 
+  arrange(RI) %>% 
+  mutate_if(is.double, round, 0)
+s_table
+```
+
+
+Write it
+
+```{r}
+write_csv(s_table, here("figs", "TableS2.csv"))
+```
+

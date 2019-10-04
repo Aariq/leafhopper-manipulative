@@ -571,7 +571,8 @@ s_table <-
   mutate(RI_lab_lit = ifelse(is.na(ri_lab), ri_lit, ri_lab),
          source2 = ifelse(!is.na(ri_lab), "standard", source)) %>% 
   select(Compound = pretty_name, CAS = cas, RI = meanRI, RI_lab_lit, Source = source2,
-         starts_with("density"), starts_with("damage"))
+         starts_with("density"), starts_with("damage")) %>% 
+  arrange(RI)
 ```
 
 ## Save!
