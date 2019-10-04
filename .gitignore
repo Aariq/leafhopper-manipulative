@@ -2,8 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
-data/raw/2018 Leaf Scans/
+data/raw/
 *.icloud
 *.pages
-*.docx
+docs
 *.nb.html
+*.xcf
+figs
