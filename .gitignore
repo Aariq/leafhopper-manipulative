@@ -9,3 +9,6 @@ docs
 *.nb.html
 *.xcf
 figs
+R/ion analytics
+R/unused
+R/wrangling
