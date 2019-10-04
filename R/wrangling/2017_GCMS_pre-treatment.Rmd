@@ -392,5 +392,5 @@ Q8 is a pretty strong outlier.
 ```{r}
 write_rds(gc_wide, here("data", "cleaned", "2017_gcms_wide.rds"))
 write_rds(gc_tidy.final, here("data", "cleaned", "2017_gcms_tidy.rds"))
-write_rds(gc_wide.zeroes, here("data", "cleaned", "2017_gcms_zeroes.rds"))
+# write_rds(gc_wide.zeroes, here("data", "cleaned", "2017_gcms_zeroes.rds"))
 ```
