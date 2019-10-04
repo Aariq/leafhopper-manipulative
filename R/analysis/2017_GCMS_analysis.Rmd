@@ -617,7 +617,6 @@ write_csv(s_table, here("figs", "TableS1.csv"))
 
 # Plots
 
-Rather than plotting all of the biomarkers, I'll choose some representatives that I want to write about in the discussion, I think.  Also, if the step/hinge functions are significant, I should plot both the lm line and the step/hinge
 
 ## Density Biomarkers
 
@@ -625,7 +624,7 @@ Rather than plotting all of the biomarkers, I'll choose some representatives tha
 dens_plotdata <- 
   full_join(dens_biomarkers, dens_univar2, by = "compound") %>% 
   left_join(annotations, by = "compound") %>%
-  dplyr::slice(1:9) %>% 
+  dplyr::slice(1:9) %>% # Just the first 9
   left_join(dens_biom_data, by = "compound") %>% 
   mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE))
 
