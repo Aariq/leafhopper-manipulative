@@ -33,21 +33,3 @@ tidy.chngpt <- function(chngpt.mod) {
     add_column(coef.p.value = summary(chngpt.mod)$coefficients[2,2])
   return(df)
 }
-
-
-
-
-
-# #Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
-# tidy.chngpt <- function(chngpt.mod) {
-#   df <- bind_cols(
-#     chngpt.mod$coefficients[1:2] %>% 
-#       t() %>% 
-#       as_tibble(),
-#     summary(chngpt.mod)$chngpt %>% 
-#       set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>%
-#       t() %>% 
-#       as_tibble()
-#   )
-#   return(df)
-# }
