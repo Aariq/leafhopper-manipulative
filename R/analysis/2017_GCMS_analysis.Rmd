@@ -111,14 +111,14 @@ tidy.chngpt <- function(chngpt.mod) {
 
 
 # Data pre-treatment
-Most data pre-treatment was done in the wrangling Rmd. I already determine that log transformation followed by scaling is probably a good idea to improve normality.  However, the data is still zero-inflated, so it might be better to just use a distance based approach instead, which I think is "nonparametric".  Maybe it doesnt' really matter though since the permuation test for the RDA is nonparametric anyway.
+Most data pre-treatment was done as part of creating the .rds files I read in here. I already determined that log transformation followed by scaling is probably a good idea to improve normality.  I also determined that removing one outlier (sample Q8) would be prudent.
 
 ```{r}
 #columns that aren't compound RPAs
 metavars <- c("sample", "cultivar", "density_start", "density_end", "mean_percent_damage", "twister_damage")
 ```
  
-**one outlier removed**
+
 
 ```{r}
 gc_wide.logscale <- 
@@ -166,20 +166,25 @@ common <-
   summarize(nsample = sum(present)) %>% 
   filter(nsample > 17) 
 nrow(common)
-common
+# common
 ```
 
 ## Summary table
 Create a summary table and join with annotations, rename unknowns in order by retention index
 
 ```{r}
-meanRIs <- gc_tidy %>% 
+meanRIs <-
+  gc_tidy %>% 
   group_by(compound) %>% 
   summarize(meanRI = mean(ri, na.rm = TRUE))
 
 annotations2 <- left_join(meanRIs, annotations.raw, by = "compound")
   
-unks <- annotations2 %>% filter(is.na(cas)) %>% arrange(meanRI) %>% add_column(unk_name = 1:nrow(.))
+unks <-
+  annotations2 %>% 
+  filter(is.na(cas)) %>% 
+  arrange(meanRI) %>% 
+  add_column(unk_name = 1:nrow(.))
 
 annotations <- 
   left_join(annotations2, unks) %>% 
@@ -211,7 +216,7 @@ synt_dens[[1]][[2]]
 ```
 10.66%
 
-### ANOVA
+### Permutation test
 
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
@@ -235,11 +240,10 @@ rda_dam <- rda(chemdata ~ gc_wide.logscale$log.mean_damage)
 synt_dam <- MVA.synt(rda_dam)
 synt_dam[[1]][[2]]
 ```
-~~5.53%~~
 
-**UPDATE**: 6.61% when log-transformed leaf damage used
+6.61%
 
-### ANOVA
+### Permutation Test
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
@@ -261,17 +265,16 @@ rda_t <- rda(chemdata ~ gc_wide.logscale$log.twister)
 synt_t <- MVA.synt(rda_t)
 synt_t[[1]][[2]]
 ```
-~~7.94%~~
-**UPDATE**: 7.67% when log-transformed twiter damage used
+7.67% 
 
-### ANOVA
+### Permutation Test
 Test for significance that this amount of explained variance is higher than the null hypothesis of no effect of the experimental design:
 
 ```{r}
 anova(rda_t)
 ```
 
-Marginally significant? Not sure if should report biomarkers.
+Marginally significant.
 
 
 # Biomarkers
@@ -302,6 +305,7 @@ dens_corr <-
   select(compound, correlation = estimate, corr.p.value = p.value)
 ```
 
+
 ### Filter
 
 Filter by either significant correlation to RDA or significant univariate regression. Arrange by absolute value of correlation coefficient.
@@ -315,9 +319,7 @@ dens_biomarkers <-
 
 ### Univariate regressions
 
-Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well, and probably plot things on a log scale.  This kinda sucks because interpretation is more complicated, but I'm gonna do it for now.  Log transformation is better than log-link glm, because we *want* the variance to be transformed.
-
-
+Log transformation improved normality of the whole dataset, so I should be consistent and use that here as well. Log transformation is better than log-link glm in this scenario, because we *want* the variance to be transformed.
 
 ```{r}
 #Only need to do this on compounds in biomarkers list
@@ -340,7 +342,8 @@ dens_univar <-
   mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
          line = map(data, ~lm(log.RPA ~ density_end, data = .x)),
          step = map(data, ~chngptm(log.RPA ~ 1, ~ density_end,
-                                   family = "gaussian", type = "step", data = .x, var.type="bootstrap", ci.bootstrap.size=100)),
+                                   family = "gaussian", type = "step", data = .x,
+                                   var.type="bootstrap", ci.bootstrap.size=100)),
          hinge = map(data, ~chngptm(log.RPA ~ 1, ~ density_end, 
                                     family = "gaussian", type = "hinge", data = .x))) %>% 
   gather(-compound, -data, key = type, value = model) %>% 
@@ -358,14 +361,15 @@ Get model info and coeficients and choose the best model by AIC, penalizing any 
 dens_univar2 <- 
   dens_univar %>% 
   filter(type %in% c("step", "hinge")) %>% 
-  mutate(coefs = map(model, tidy.chngpt)) %>% 
+  mutate(coefs = purrr::map(model, tidy.chngpt)) %>% 
   unnest(coefs) %>% 
   select(-data, -model, -fit) %>% 
   #joins to null and line models
   left_join(dens_univar, .) %>%
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
-  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$density_end) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$density_end) | is.na(chngpt.upper.CI),
+                       AIC, Inf)) %>% 
   #set AIC to very high if coefficient isn't significantly different from zero
   mutate(AIC = if_else(coef.p.value > 0.05, Inf, AIC,missing = AIC)) %>% 
   group_by(compound) %>%
@@ -386,19 +390,6 @@ dens_univar_out <-
 
 
 ### Merge to create tables
-
-Supplemental table should have:
-
-- Compound
-- CAS
-- experimental RI
-- Lit/lab RI
-- Correlation with density RDA
-- Correlation with damage RDA (if I decide it's significant)
-
-```{r}
-#TODO make supplemental table
-```
 
 
 Biomarker table should have: 
@@ -513,7 +504,8 @@ dam_univar2 <-
   left_join(dam_univar, .) %>%
   #set AIC to very high if the threshold CI overlaps zero
   mutate(AIC = if_else(chngpt.lower.CI > 0 | is.na(chngpt.lower.CI), AIC, Inf)) %>%
-  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$log.twister) | is.na(chngpt.upper.CI), AIC, Inf)) %>% 
+  mutate(AIC = if_else(chngpt.upper.CI < max(gc_tidy$log.twister) | is.na(chngpt.upper.CI),
+                       AIC, Inf)) %>% 
   #set AIC to very high if coefficient isn't significantly different from zero
   mutate(AIC = if_else(coef.p.value > 0.05, Inf, AIC,missing = AIC)) %>% 
   group_by(compound) %>%
@@ -571,7 +563,57 @@ table2 <-
 
 write_excel_csv(table2, here("figs", "2017 damage biomarkers.csv"), na = "-")
 ```
+# Supplemental table
 
+Supplemental table should have:
+
+- Compound
+- Unknowns re-nammed by RI order
+- CAS
+- experimental RI
+- Lit/lab RI
+- Correlation with density RDA
+- Correlation with damage RDA
+
+## Join Loadings
+```{r}
+all_loads <-
+  full_join(dens_loads, dam_loads, by = "compound") %>% 
+  select(compound, density_rda_load = RDA1.x, damage_rda_load = RDA1.y)
+```
+
+## Join Correlations
+```{r}
+all_cors <-
+  full_join(dens_corr, dam_corr, by = "compound") %>% 
+  select(compound,
+         density_rda_corr = correlation.x, density_corr_pval = corr.p.value.x,
+         damage_rda_corr = correlation.y, damage_corr_pval = corr.p.value.y)
+```
+
+## join loadings and correlations
+
+```{r}
+all_rda_output <-
+  full_join(all_loads, all_cors, by = "compound") %>% 
+  select(compound, starts_with("density"), starts_with("damage"))
+```
+
+## Join with annotations and clean up
+```{r}
+s_table <-
+  full_join(all_rda_output, annotations, by = "compound") %>% 
+  mutate(RI_lab_lit = ifelse(is.na(ri_lab), ri_lit, ri_lab),
+         source2 = ifelse(!is.na(ri_lab), "standard", source)) %>% 
+  select(Compound = pretty_name, CAS = cas, RI = meanRI, RI_lab_lit, Source = source2,
+         starts_with("density"), starts_with("damage"))
+```
+
+## Save!
+
+```{r}
+write_csv(s_table, here("figs", "TableS1.csv"))
+```
 
 # Plots
 
