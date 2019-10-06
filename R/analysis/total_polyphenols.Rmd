@@ -313,6 +313,8 @@ dam_dens_tp <-
 
 dam_dens_tp
 save_plot(here('figs', 'tp.png'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
+save_plot(here('figs', 'figure4.jpg'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
+
 ```
 
 

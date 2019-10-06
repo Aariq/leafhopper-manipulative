@@ -444,7 +444,8 @@ dam_univar <-
   mutate(null = map(data, ~lm(log.RPA ~ 1, data = .x)),
          line = map(data, ~lm(log.RPA ~ log.twister, data = .x)),
          step = map(data, ~chngptm(log.RPA ~ 1, ~ log.twister,
-                                   family = "gaussian", type = "step", data = .x, var.type = "bootstrap", ci.bootstrap.size = 100)),
+                                   family = "gaussian", type = "step", data = .x,
+                                   var.type = "bootstrap", ci.bootstrap.size = 100)),
          hinge = map(data, ~chngptm(log.RPA ~ 1, ~ log.twister, 
                                     family = "gaussian", type = "hinge", data = .x))) %>% 
   gather(-compound, -data, key = type, value = model) %>% 
@@ -632,6 +633,11 @@ save_plot(here("figs", "density-biomarkers.png"), dens_plot,
           nrow = 3, 
           base_height = 2,
           base_asp = 1.3)
+save_plot(here("figs", "figure2.jpg"), dens_plot,
+          ncol = 3,
+          nrow = 3, 
+          base_height = 2,
+          base_asp = 1.3)
 ```
 
 
@@ -679,6 +685,12 @@ dam_plot
 
 ```{r}
 save_plot(here("figs", "damage-biomarkers.png"), dam_plot,
+          ncol = 3,
+          nrow = 3,
+          base_height = 2,
+          base_asp = 1.3)
+
+save_plot(here("figs", "figure3.jpg"), dam_plot,
           ncol = 3,
           nrow = 3,
           base_height = 2,

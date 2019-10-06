@@ -36,15 +36,7 @@ library(chngpt)
 here <- here::here #make sure to override the here() function from lubridate
 ```
 ```{r}
-
-#Custom tidier for chngpt models. Turns output into dataframe.  Warning: this is not very reusable code.
-tidy.chngpt <- function(chngpt.mod) {
-  df <- bind_cols(
-    chngpt.mod$coefficients[1:2] %>% t() %>% as_tibble(),
-    summary(chngpt.mod)$chngpt %>%  set_names(c("chngpt", "chngpt.lower.CI", "chngpt.upper.CI")) %>% t() %>% as_tibble()
-  )
-  return(df)
-}
+source(here("R", "functions.R"))
 ```
 
 # Purpose
@@ -328,6 +320,11 @@ lc_plot.2017
 
 ```{r}
 save_plot(here("figs", "lc_biomarker_plot_2017.png"), lc_plot.2017,
+          ncol = 2,
+          nrow = 2,
+          base_height = 2,
+          base_asp = 1.3)
+save_plot(here("figs", "figure5.jpg"), lc_plot.2017,
           ncol = 2,
           nrow = 2,
           base_height = 2,

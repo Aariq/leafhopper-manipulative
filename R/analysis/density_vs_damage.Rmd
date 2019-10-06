@@ -227,6 +227,7 @@ dens_dam_full <-
 dens_vs_dam
 dens_dam_full
 save_plot(here('figs', 'dam_dens_img.png'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
+save_plot(here('figs', 'figure1.jpg'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
 ```
 
 
