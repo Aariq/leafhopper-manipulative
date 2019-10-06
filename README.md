@@ -5,4 +5,4 @@
 <!-- badges: end -->
 
 
-This repository contains cleaned data and analysis scripts.  Data is saved as R data objects (.rds files) and analysis is done in severa R Markdown documents (.Rmd files).
+This repository contains cleaned data and analysis scripts.  Data is saved as R data objects (.rds files) and analysis is done in several R Markdown documents (.Rmd files).
