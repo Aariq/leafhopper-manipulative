@@ -54,6 +54,34 @@ The two damage dataframes contain data from the experimental treatments and the 
 - `density_start`: the density of leafhoppers I actually got
 - `density_end`: the density of leafhoppers recovered at the end of the feeding period
 
+# Descriptive
+
+```{r}
+damage2017 %>% 
+  filter(sample != "Q2") %>% 
+  summarize(min_dens = min(density_end),
+            max_dens = max(density_end),
+            mean_dens = mean(density_end),
+            sd_dens = sd(density_end),
+            min_dam = min(mean_percent_damage),
+            max_dam = max(mean_percent_damage),
+            mean_dam = mean(mean_percent_damage),
+            sd_dam = sd(mean_percent_damage))
+```
+```{r}
+damage2018 %>% 
+  filter(sample != "J23") %>% 
+  group_by(cultivar) %>% 
+  summarize(min_dens = min(density_end),
+            max_dens = max(density_end),
+            mean_dens = mean(density_end),
+            sd_dens = sd(density_end),
+            min_dam = min(mean_percent_damage),
+            max_dam = max(mean_percent_damage),
+            mean_dam = mean(mean_percent_damage),
+            sd_dam = sd(mean_percent_damage))
+```
+
 # Analysis
 ## 2017 Relationship between density and damage
 
