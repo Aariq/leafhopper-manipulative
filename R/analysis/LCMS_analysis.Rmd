@@ -316,6 +316,8 @@ lc_plot.2017 <-
   labs(x = "ln(mean % leaf damage)",
        y = "Concentration (µg/mg)")
 lc_plot.2017
+
+lc_plotdata.2017 %>% count(sample)
 ```
 
 ```{r}

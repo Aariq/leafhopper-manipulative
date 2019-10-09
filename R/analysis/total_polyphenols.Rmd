@@ -288,6 +288,7 @@ dam.2018.plot <-
   scale_shape_discrete(name = "Cultivar", labels = c("J" = "JGY", "L" = "LJ")) +
   theme_bw() 
 dam.2018.plot
+tp2018 %>% count(cultivar)
 ```
 
 # Figures

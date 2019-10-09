@@ -164,7 +164,7 @@ __Without sample J23:__
 
 ```{r}
 damage2018 <- damage2018 %>% filter(sample != "J23")
-
+damage2018 %>% count(cultivar)
 #re-create plot
 dens_dam_2018 <-
   ggplot(damage2018,

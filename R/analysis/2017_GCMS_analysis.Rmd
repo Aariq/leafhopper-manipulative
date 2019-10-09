@@ -680,6 +680,7 @@ dam_plot <-
        y = "ln(relative peak area)") +
   theme_bw()
 dam_plot
+dam_plotdata %>% count(sample)
 ```
 
 
