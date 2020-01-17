@@ -313,11 +313,22 @@ dam_dens_tp <-
   plot_grid(get_legend(dam.2018.plot), rel_widths = c(1, 0.1))
 
 dam_dens_tp
-save_plot(here('figs', 'tp.png'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
-save_plot(here('figs', 'figure4.jpg'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
+# save_plot(here('figs', 'tp.png'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
+# save_plot(here('figs', 'figure4.jpg'), dam_dens_tp, ncol = 2, nrow = 2, base_asp = 1.1)
 
 ```
 
 
+# Plot with only 2017
 
+```{r}
+tp_just2017 <-
+  plot_grid(dam.2017.plot + labs(title = NULL),
+            dens.2017.plot + labs(title = NULL), 
+            labels = "AUTO")
+```
+
+```{r}
+save_plot(here('figs', 'figure4.jpg'), tp_just2017, ncol = 2, nrow = 1, base_asp = 1.1)
+```
 

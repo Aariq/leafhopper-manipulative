@@ -83,6 +83,24 @@ damage2018 %>%
 ```
 
 # Analysis
+## 2017 correlation between intitial and final density
+
+```{r}
+damage2017
+cor.test(damage2017$density_start, damage2017$density_end)
+```
+```{r}
+initial_final <-
+  ggplot(damage2017, aes(x = density_start, y = density_end)) + 
+  geom_point(size = 2, alpha = 0.5) +
+  labs(y = "Final leafhopper density (insects / young leaf)",
+       x = "Initial leafhopper density (insects / young leaf)") +
+  theme_bw()
+initial_final
+save_plot(here("figs", "figureS1.jpg"), initial_final)
+```
+
+
 ## 2017 Relationship between density and damage
 
 Let's check the relationship between leafhopper density and damage
@@ -254,8 +272,27 @@ dens_dam_full <-
 
 dens_vs_dam
 dens_dam_full
-save_plot(here('figs', 'dam_dens_img.png'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
-save_plot(here('figs', 'figure1.jpg'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
+# save_plot(here('figs', 'dam_dens_img.png'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
+# save_plot(here('figs', 'figure1.jpg'), dens_dam_full, ncol = 2, nrow = 2, base_asp = 1.1)
 ```
 
+# Version with only 2017 data
+
+```{r}
+leaf_examples2 <-
+  image_append(
+    c(image_append(c(low, mid)),
+    image_append(c(high, high2))),
+    stack = TRUE
+    ) %>%
+  image_border("white", "50x50") %>% 
+  rasterGrob()
+
+
+dens_dam_full_2017 <- plot_grid(leaf_examples2, dens_dam_2017 + labs(subtitle = NULL), labels = "AUTO")
+```
+
+```{r}
+save_plot(here("figs", "figure1.jpg"), dens_dam_full_2017, ncol = 2, nrow = 1, base_asp = 1.1)
+```
 
