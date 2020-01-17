@@ -641,9 +641,16 @@ save_plot(here("figs", "figure2.jpg"), dens_plot,
 # save a version for talks
 # save_plot(here("figs", "figure2_talk.png"), dens_plot,
 #           ncol = 3,
-#           nrow = 3, 
-#           base_height = 1.7,
-#           base_asp = 1.6)
+#           nrow = 3,
+#           base_height = 1.6,
+#           base_asp = 1.7)
+# library(ggedit)
+# dens_plot_nolines <- remove_geom(dens_plot, "segment", c(1,2)) %>%  remove_geom("smooth")
+# save_plot(here("figs", "figure2_talk_nolines.png"), dens_plot_nolines,
+#           ncol = 3,
+#           nrow = 3,
+#           base_height = 1.6,
+#           base_asp = 1.7)
 ```
 
 
@@ -704,6 +711,13 @@ save_plot(here("figs", "figure3.jpg"), dam_plot,
           base_asp = 1.3)
 # # save a talk version
 # save_plot(here("figs", "figure3_talk.png"), dam_plot,
+#           ncol = 3,
+#           nrow = 3,
+#           base_height = 1.6,
+#           base_asp = 1.7)
+# library(ggedit)
+# dam_plot_nolines <- remove_geom(dam_plot, "segment", c(1,2)) %>%  remove_geom("smooth")
+# save_plot(here("figs", "figure3_talk_nolines.png"), dam_plot_nolines,
 #           ncol = 3,
 #           nrow = 3,
 #           base_height = 1.6,
