@@ -6,4 +6,4 @@
 <!-- badges: end -->
 
 
-This repository contains cleaned data and analysis scripts.  Data is saved as R data objects (.rds files) and analysis is done in several R Markdown documents (.Rmd files).
+This repository contains cleaned data and analysis scripts.  Data is saved as both R data objects (.rds files) and .csv files, and analysis is done in several R Markdown documents (.Rmd files).  NOTE: this repository contains data and analysis for two years of experiments.  However, only the 2017 experiment and data is used for the associated manuscript.  In 2018, the experiment used densities of leafhoppers that were too low to induce a response by the tea plant, and therefore we were not able to detect the effects of leafhopper density on tea metabolites.
