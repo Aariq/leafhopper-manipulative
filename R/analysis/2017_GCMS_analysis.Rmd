@@ -593,7 +593,8 @@ dens_plotdata <-
   left_join(annotations, by = "compound") %>%
   dplyr::slice(1:9) %>% # Just the first 9
   left_join(dens_biom_data, by = "compound") %>% 
-  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE))
+  mutate(pretty_name = fct_reorder(pretty_name, abs(correlation), mean, .desc = TRUE) %>%
+           fct_recode(`Unknown 3` = "3"))
 
 #just linear models
 dens_justlm <- dens_plotdata %>% filter(type == "line")
